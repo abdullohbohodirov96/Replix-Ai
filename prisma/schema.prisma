@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Manager {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String?
+  email       String?
+  avatar      String?  // initials color
+  position    String?  @default("Sales Manager")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  calls       Call[]
+  reports     DailyReport[]
+}
+
+model Call {
+  id              String    @id @default(cuid())
+  managerId       String
+  manager         Manager   @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  audioFileName   String
+  audioPath       String
+  duration        Int?      // seconds
+  transcription   String?   // Uzbek transcription
+  analysis        String?   // GPT analysis in Uzbek
+  rating          Float?    // 1.0 - 5.0 stars
+  problems        String?   // JSON array of problems
+  positives       String?   // JSON array of positives
+  clientSentiment String?   // "positive" | "negative" | "neutral"
+  callOutcome     String?   // "sale" | "followup" | "rejected" | "unknown"
+  summary         String?   // short summary in Uzbek
+  createdAt       DateTime  @default(now())
+  callDate        DateTime  @default(now())
+}
+
+model DailyReport {
+  id            String   @id @default(cuid())
+  managerId     String
+  manager       Manager  @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  date          DateTime
+  totalCalls    Int      @default(0)
+  avgRating     Float    @default(0)
+  topProblems   String?  // JSON
+  summary       String?
+  improvement   String?
+  createdAt     DateTime @default(now())
+  
+  @@unique([managerId, date])
+}

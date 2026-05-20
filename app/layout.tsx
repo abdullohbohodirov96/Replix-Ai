@@ -1,0 +1,40 @@
+import type { Metadata } from 'next'
+import './globals.css'
+import Sidebar from '@/components/Sidebar'
+
+export const metadata: Metadata = {
+  title: 'Replix AI — Sales Analytics',
+  description: 'Qara Manda qurilish do\'koni uchun AI-powered savdo tahlil platformasi. Abdulloh tomonidan yaratilgan.',
+  icons: {
+    icon: '/favicon.ico',
+  },
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="uz" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="bg-[#080810] text-[#E8E8F5] font-sans antialiased">
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 ml-64 min-h-screen">
+            <div className="p-8 animate-fade-in">
+              {children}
+            </div>
+          </main>
+        </div>
+      </body>
+    </html>
+  )
+}
