@@ -35,7 +35,7 @@ function ManagerCard({ manager }: { manager: Awaited<ReturnType<typeof getManage
     .flatMap(c => {
       try { return JSON.parse(c.problems || '[]') } catch { return [] }
     })
-  const uniqueProblems = [...new Set(allProblems)].slice(0, 2)
+  const uniqueProblems = Array.from(new Set(allProblems)).slice(0, 2)
 
   const ratingColor = avgRating >= 4 ? 'text-green-400' : avgRating >= 3 ? 'text-yellow-400' : avgRating > 0 ? 'text-red-400' : 'text-[#333360]'
   const ratingBg = avgRating >= 4 ? 'border-green-500/20 bg-green-500/5' : avgRating >= 3 ? 'border-yellow-500/20 bg-yellow-500/5' : avgRating > 0 ? 'border-red-500/20 bg-red-500/5' : 'border-[#1E1E35] bg-[#0D0D1A]'
