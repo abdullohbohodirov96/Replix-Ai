@@ -3,9 +3,5 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'prisma'],
   },
-  api: {
-    bodyParser: false,
-  },
 }
-
 module.exports = nextConfig
