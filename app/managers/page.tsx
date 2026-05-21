@@ -33,7 +33,7 @@ function ManagerCard({ manager }: { manager: Awaited<ReturnType<typeof getManage
 
   const allProblems: string[] = calls
     .flatMap(c => {
-      try { return JSON.parse(c.problems || '[]') } catch { return [] }
+      try { return JSON.parse(c.problems || '[]') as string[] } catch { return [] }
     })
   const uniqueProblems = Array.from(new Set(allProblems)).slice(0, 2)
 

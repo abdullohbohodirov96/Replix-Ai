@@ -59,14 +59,14 @@ export default async function ReportsPage() {
       ? todayCalls.reduce((s, c) => s + (c.rating || 0), 0) / todayCalls.length
       : 0
 
-    const allProblems = allCalls.flatMap(c => {
-      try { return JSON.parse(c.problems || '[]') } catch { return [] }
+    const allProblems: string[] = allCalls.flatMap(c => {
+      try { return JSON.parse(c.problems || '[]') as string[] } catch { return [] }
     })
-    const problemFreq = allProblems.reduce((acc, p) => {
+    const problemFreq = allProblems.reduce<Record<string, number>>((acc, p) => {
       acc[p] = (acc[p] || 0) + 1
       return acc
-    }, {} as Record<string, number>)
-    const topProblems = Object.entries(problemFreq).sort(([,a],[,b]) => (b as number)-(a as number)).slice(0,3)
+    }, {})
+    const topProblems = (Object.entries(problemFreq) as [string, number][]).sort(([,a],[,b]) => b-a).slice(0,3)
 
     return { manager: mgr, todayCalls, allCalls, avgRating, todayAvg, topProblems }
   })

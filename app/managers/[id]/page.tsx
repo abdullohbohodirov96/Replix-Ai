@@ -78,14 +78,14 @@ export default async function ManagerDetailPage({
   }
 
   const allProblems: string[] = calls.flatMap(c => {
-    try { return JSON.parse(c.problems || '[]') } catch { return [] }
+    try { return JSON.parse(c.problems || '[]') as string[] } catch { return [] }
   })
-  const problemFreq = allProblems.reduce((acc, p) => {
+  const problemFreq = allProblems.reduce<Record<string, number>>((acc, p) => {
     acc[p] = (acc[p] || 0) + 1
     return acc
-  }, {} as Record<string, number>)
-  const topProblems = Object.entries(problemFreq)
-    .sort(([, a], [, b]) => (b as number) - (a as number))
+  }, {})
+  const topProblems = (Object.entries(problemFreq) as [string, number][])
+    .sort(([, a], [, b]) => b - a)
     .slice(0, 5)
 
   const ratingColor = avgRating >= 4 ? '#10B981' : avgRating >= 3 ? '#F59E0B' : avgRating > 0 ? '#EF4444' : '#333360'
@@ -169,8 +169,8 @@ export default async function ManagerDetailPage({
               {calls.map((call) => {
                 let problems: string[] = []
                 let positives: string[] = []
-                try { problems = JSON.parse(call.problems || '[]') } catch {}
-                try { positives = JSON.parse(call.positives || '[]') } catch {}
+                try { problems = JSON.parse(call.problems || '[]') as string[] } catch {}
+                try { positives = JSON.parse(call.positives || '[]') as string[] } catch {}
 
                 return (
                   <div key={call.id} className="bg-[#0D0D1A] border border-[#1E1E35] rounded-xl overflow-hidden">
