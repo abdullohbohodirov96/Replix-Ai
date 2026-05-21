@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { signIn, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
@@ -51,10 +51,6 @@ export default function LandingPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (status === 'authenticated') router.replace('/dashboard')
-  }, [status, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -144,48 +140,68 @@ export default function LandingPage() {
           <div className="relative">
             <div className="absolute -inset-0.5 bg-gradient-to-br from-[#FF6B35]/40 to-transparent rounded-2xl blur opacity-60" />
             <div className="relative bg-[#0D0D1A]/95 backdrop-blur-xl border border-[#1E1E35] rounded-2xl p-8 shadow-2xl">
-              <div className="flex items-center gap-2.5 mb-1">
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#FF3D00] flex items-center justify-center">
-                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h6a3 3 0 013 3v1" />
-                  </svg>
-                </div>
-                <h2 className="text-lg font-display font-700 text-white">Tizimga kirish</h2>
-              </div>
-              <p className="text-xs font-mono text-[#5555AA] mb-6">Akkauntingiz bilan davom eting</p>
-
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Email</label>
-                  <input
-                    type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    placeholder="admin@dunyabunya.uz" required disabled={loading}
-                    className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-4 py-3 focus:outline-none transition-colors disabled:opacity-50 placeholder-[#333360]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Parol</label>
-                  <input
-                    type="password" value={password} onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••" required disabled={loading}
-                    className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-4 py-3 focus:outline-none transition-colors disabled:opacity-50 placeholder-[#333360]"
-                  />
-                </div>
-                {error && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5">
-                    <p className="text-sm font-mono text-red-400">{error}</p>
+              {status === 'authenticated' ? (
+                <div className="text-center py-4">
+                  <div className="w-14 h-14 rounded-full bg-[#FF6B35]/10 border border-[#FF6B35]/20 flex items-center justify-center mx-auto mb-4">
+                    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#FF6B35" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                   </div>
-                )}
-                <button
-                  type="submit" disabled={loading || !email || !password}
-                  className="w-full py-3 bg-[#FF6B35] hover:bg-[#FF5520] disabled:opacity-40 disabled:cursor-not-allowed text-white font-display font-600 rounded-lg transition-colors shadow-lg shadow-orange-500/20"
-                >
-                  {loading ? 'Kirilmoqda...' : 'Kirish'}
-                </button>
-              </form>
-              <p className="mt-5 text-center text-[11px] font-mono text-[#333360]">
-                Akkauntingiz yo'qmi? Administrator bilan bog'laning
-              </p>
+                  <h2 className="text-lg font-display font-700 text-white mb-1">Tizimga kirilgan</h2>
+                  <p className="text-xs font-mono text-[#5555AA] mb-6">Siz allaqachon tizimga kirgansiz</p>
+                  <button
+                    onClick={() => router.push('/dashboard')}
+                    className="w-full py-3 bg-[#FF6B35] hover:bg-[#FF5520] text-white font-display font-600 rounded-lg transition-colors shadow-lg shadow-orange-500/20"
+                  >
+                    Dashboard ga o'tish →
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#FF3D00] flex items-center justify-center">
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h6a3 3 0 013 3v1" />
+                      </svg>
+                    </div>
+                    <h2 className="text-lg font-display font-700 text-white">Tizimga kirish</h2>
+                  </div>
+                  <p className="text-xs font-mono text-[#5555AA] mb-6">Akkauntingiz bilan davom eting</p>
+
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                      <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Email</label>
+                      <input
+                        type="email" value={email} onChange={e => setEmail(e.target.value)}
+                        placeholder="admin@dunyabunya.uz" required disabled={loading}
+                        className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-4 py-3 focus:outline-none transition-colors disabled:opacity-50 placeholder-[#333360]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Parol</label>
+                      <input
+                        type="password" value={password} onChange={e => setPassword(e.target.value)}
+                        placeholder="••••••••" required disabled={loading}
+                        className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-4 py-3 focus:outline-none transition-colors disabled:opacity-50 placeholder-[#333360]"
+                      />
+                    </div>
+                    {error && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5">
+                        <p className="text-sm font-mono text-red-400">{error}</p>
+                      </div>
+                    )}
+                    <button
+                      type="submit" disabled={loading || !email || !password}
+                      className="w-full py-3 bg-[#FF6B35] hover:bg-[#FF5520] disabled:opacity-40 disabled:cursor-not-allowed text-white font-display font-600 rounded-lg transition-colors shadow-lg shadow-orange-500/20"
+                    >
+                      {loading ? 'Kirilmoqda...' : 'Kirish'}
+                    </button>
+                  </form>
+                  <p className="mt-5 text-center text-[11px] font-mono text-[#333360]">
+                    Akkauntingiz yo'qmi? Administrator bilan bog'laning
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
