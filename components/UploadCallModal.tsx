@@ -9,6 +9,22 @@ interface Manager {
   position?: string | null
 }
 
+interface CallResult {
+  id: string
+  managerId: string
+  managerName: string
+  audioFileName: string
+  transcription: string | null
+  analysis: string | null
+  rating: number | null
+  problems: string[]
+  positives: string[]
+  clientSentiment: string | null
+  callOutcome: string | null
+  summary: string | null
+  createdAt: string
+}
+
 interface Props {
   managerId?: string
   managerName?: string
@@ -21,7 +37,7 @@ export default function UploadCallModal({ managerId, managerName, managers }: Pr
   const [selectedManagerId, setSelectedManagerId] = useState(managerId || '')
   const [dragging, setDragging] = useState(false)
   const [status, setStatus] = useState<'idle' | 'uploading' | 'transcribing' | 'analyzing' | 'done' | 'error'>('idle')
-  const [result, setResult] = useState<Record<string, unknown> | null>(null)
+  const [result, setResult] = useState<CallResult | null>(null)
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -247,9 +263,9 @@ export default function UploadCallModal({ managerId, managerName, managers }: Pr
                     <span className="text-xs font-mono text-[#9494B8]">Baho:</span>
                     <div className="flex items-center gap-1">
                       {[1,2,3,4,5].map(i => (
-                        <span key={i} className={`text-lg ${i <= Math.round((result.rating as number) || 0) ? 'text-[#FF6B35]' : 'text-[#1E1E35]'}`}>★</span>
+                        <span key={i} className={`text-lg ${i <= Math.round(result.rating || 0) ? 'text-[#FF6B35]' : 'text-[#1E1E35]'}`}>★</span>
                       ))}
-                      <span className="ml-1 text-sm font-mono text-[#FF6B35] font-500">{(result.rating as number)?.toFixed(1)}/5.0</span>
+                      <span className="ml-1 text-sm font-mono text-[#FF6B35] font-500">{result.rating?.toFixed(1)}/5.0</span>
                     </div>
                   </div>
 
@@ -257,15 +273,15 @@ export default function UploadCallModal({ managerId, managerName, managers }: Pr
                   {result.summary && (
                     <div className="bg-[#111122] border border-[#1E1E35] rounded-lg p-3">
                       <div className="text-[10px] font-mono text-[#FF6B35] uppercase tracking-widest mb-1">Xulosa</div>
-                      <p className="text-xs font-mono text-[#9494B8]">{result.summary as string}</p>
+                      <p className="text-xs font-mono text-[#9494B8]">{result.summary}</p>
                     </div>
                   )}
 
                   {/* Problems */}
-                  {Array.isArray(result.problems) && (result.problems as string[]).length > 0 && (
+                  {result.problems.length > 0 && (
                     <div>
                       <div className="text-[10px] font-mono text-red-400 uppercase tracking-widest mb-1">Muammolar</div>
-                      {(result.problems as string[]).map((p, i) => (
+                      {result.problems.map((p, i) => (
                         <div key={i} className="text-xs font-mono text-[#9494B8] flex items-start gap-1.5 mb-1">
                           <span className="text-red-400">⚠</span>{p}
                         </div>
