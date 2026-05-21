@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import AddManagerModal from '@/components/AddManagerModal'
+import DeleteManagerButton from '@/components/DeleteManagerButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -41,10 +42,14 @@ function ManagerCard({ manager }: { manager: Awaited<ReturnType<typeof getManage
   const ratingBg = avgRating >= 4 ? 'border-green-500/20 bg-green-500/5' : avgRating >= 3 ? 'border-yellow-500/20 bg-yellow-500/5' : avgRating > 0 ? 'border-red-500/20 bg-red-500/5' : 'border-[#1E1E35] bg-[#0D0D1A]'
 
   return (
-    <Link href={`/managers/${manager.id}`}>
-      <div className="bg-[#0D0D1A] border border-[#1E1E35] rounded-xl p-5 card-hover cursor-pointer h-full">
+    <div className="relative bg-[#0D0D1A] border border-[#1E1E35] rounded-xl p-5 card-hover h-full">
+      {/* Delete button — top-right corner, outside the link */}
+      <div className="absolute top-3 right-3 z-10">
+        <DeleteManagerButton managerId={manager.id} managerName={manager.name} />
+      </div>
+      <Link href={`/managers/${manager.id}`} className="block h-full">
         {/* Header */}
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-4 pr-8">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#FF6B35]/20 to-[#FF3D00]/10 border border-[#FF6B35]/20 flex items-center justify-center text-lg font-display font-700 text-[#FF6B35]">
               {manager.name.charAt(0)}
