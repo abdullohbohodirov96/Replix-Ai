@@ -26,7 +26,7 @@ export default function LoginPage() {
       setError('Email yoki parol noto\'g\'ri')
       setLoading(false)
     } else {
-      router.push('/')
+      router.push('/dashboard')
       router.refresh()
     }
   }

@@ -1,277 +1,286 @@
-import { prisma } from '@/lib/prisma'
-import Link from 'next/link'
-import { format } from 'date-fns'
+'use client'
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+import { useState, useEffect } from 'react'
+import { signIn, useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 
-async function getDashboardStats() {
-  const [totalManagers, totalCalls, recentCalls, managers] = await Promise.all([
-    prisma.manager.count(),
-    prisma.call.count(),
-    prisma.call.findMany({
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true, callOutcome: true, rating: true, summary: true, createdAt: true,
-        manager: { select: { id: true, name: true } },
-      },
-    }),
-    prisma.manager.findMany({
-      include: {
-        calls: {
-          select: { rating: true, callOutcome: true },
-        },
-      },
-      take: 5,
-    }),
-  ])
+const FEATURES = [
+  {
+    icon: '🎙️',
+    title: 'AI Audio Tahlil',
+    desc: 'Qo\'ng\'iroq yozuvlarini Whisper AI matnga aylantiradi va GPT chuqur tahlil qiladi.',
+  },
+  {
+    icon: '⭐',
+    title: '5 Yulduzli Baho',
+    desc: 'Har bir qo\'ng\'iroq professionallik darajasi bo\'yicha avtomatik baholanadi.',
+  },
+  {
+    icon: '💡',
+    title: 'Aniq Tavsiyalar',
+    desc: 'Har bir xato uchun "manager nima deyishi kerak edi" — aniq skript bilan.',
+  },
+  {
+    icon: '📊',
+    title: 'Hisobot & Statistika',
+    desc: 'Managerlar reytingi, muammolar tahlili va kunlik AI hisobotlar.',
+  },
+  {
+    icon: '🤖',
+    title: 'AI Yordamchi',
+    desc: 'Savollaringizga javob beruvchi chatbot va admin bilan tezkor aloqa.',
+  },
+  {
+    icon: '👥',
+    title: 'Ko\'p Akkaunt',
+    desc: 'Admin va managerlar uchun alohida rollar — CRM tizimi kabi boshqaruv.',
+  },
+]
 
-  const avgRating = await prisma.call.aggregate({
-    _avg: { rating: true },
-  })
+const HELP_STEPS = [
+  { n: '01', t: 'Tizimga kiring', d: 'Admin sizga bergan email va parol bilan kiring.' },
+  { n: '02', t: 'Manager qo\'shing', d: 'Savdo managerlaringizni tizimga kiriting.' },
+  { n: '03', t: 'Audio yuklang', d: 'Qo\'ng\'iroq yozuvini yuklang — AI avtomatik tahlil qiladi.' },
+  { n: '04', t: 'Natijani ko\'ring', d: 'Baho, muammolar va aniq tavsiyalarni o\'qing.' },
+]
 
-  const todayCalls = await prisma.call.count({
-    where: {
-      createdAt: {
-        gte: new Date(new Date().setHours(0, 0, 0, 0)),
-      },
-    },
-  })
+export default function LandingPage() {
+  const router = useRouter()
+  const { status } = useSession()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  return { totalManagers, totalCalls, recentCalls, avgRating, todayCalls, managers }
-}
+  useEffect(() => {
+    if (status === 'authenticated') router.replace('/dashboard')
+  }, [status, router])
 
-function StarRatingDisplay({ rating }: { rating: number | null }) {
-  if (!rating) return <span className="text-[#333360] font-mono text-sm">—</span>
-  
-  const stars = []
-  for (let i = 1; i <= 5; i++) {
-    stars.push(
-      <span key={i} className={i <= Math.round(rating) ? 'text-[#FF6B35]' : 'text-[#1E1E35]'}>
-        ★
-      </span>
-    )
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    const res = await signIn('credentials', { email, password, redirect: false })
+    if (res?.error) {
+      setError('Email yoki parol noto\'g\'ri')
+      setLoading(false)
+    } else {
+      router.push('/dashboard')
+      router.refresh()
+    }
   }
-  return (
-    <span className="flex items-center gap-0.5 text-sm">
-      {stars}
-      <span className="ml-1.5 font-mono text-xs text-[#9494B8]">{rating.toFixed(1)}</span>
-    </span>
-  )
-}
-
-function OutcomeBadge({ outcome }: { outcome: string | null }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    sale:      { label: '✓ Sotildi',     cls: 'badge-success' },
-    followup:  { label: '→ Davom etadi', cls: 'badge-info' },
-    rejected:  { label: '✗ Rad etildi',  cls: 'badge-danger' },
-    unknown:   { label: '? Noma\'lum',   cls: 'badge-neutral' },
-  }
-  const o = map[outcome || 'unknown'] || map['unknown']
-  return <span className={`badge ${o.cls}`}>{o.label}</span>
-}
-
-function SentimentBadge({ sentiment }: { sentiment: string | null }) {
-  if (!sentiment) return null
-  const map: Record<string, { label: string; cls: string }> = {
-    positive: { label: '😊 Ijobiy', cls: 'badge-success' },
-    negative: { label: '😞 Salbiy', cls: 'badge-danger' },
-    neutral:  { label: '😐 Neytral', cls: 'badge-neutral' },
-  }
-  const s = map[sentiment] || map['neutral']
-  return <span className={`badge ${s.cls}`}>{s.label}</span>
-}
-
-export default async function DashboardPage() {
-  const { totalManagers, totalCalls, recentCalls, avgRating, todayCalls, managers } =
-    await getDashboardStats()
-
-  const statCards = [
-    {
-      label: 'Jami Managerlar',
-      value: totalManagers,
-      icon: '👥',
-      color: 'from-blue-500/10 to-blue-600/5',
-      border: 'border-blue-500/20',
-    },
-    {
-      label: "Jami Qo'ng'iroqlar",
-      value: totalCalls,
-      icon: '📞',
-      color: 'from-orange-500/10 to-orange-600/5',
-      border: 'border-orange-500/20',
-    },
-    {
-      label: 'Bugun',
-      value: todayCalls,
-      icon: '📅',
-      color: 'from-purple-500/10 to-purple-600/5',
-      border: 'border-purple-500/20',
-    },
-    {
-      label: "O'rtacha Baho",
-      value: avgRating._avg.rating ? `${avgRating._avg.rating.toFixed(1)} ★` : '—',
-      icon: '⭐',
-      color: 'from-yellow-500/10 to-yellow-600/5',
-      border: 'border-yellow-500/20',
-    },
-  ]
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono text-[#FF6B35] uppercase tracking-widest">
-              Replix AI
-            </span>
-            <span className="text-[#1E1E35]">—</span>
-            <span className="text-xs font-mono text-[#5555AA]">
-              {format(new Date(), 'dd.MM.yyyy')}
-            </span>
+    <div className="min-h-screen bg-[#070710] text-[#E8E8F5] overflow-x-hidden">
+      {/* Background glow */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-[#FF6B35]/10 blur-[120px]" />
+        <div className="absolute top-1/3 -right-40 w-[400px] h-[400px] rounded-full bg-[#FF3D00]/8 blur-[120px]" />
+        <div className="absolute inset-0 opacity-[0.15]"
+          style={{ backgroundImage: 'linear-gradient(#1E1E35 1px, transparent 1px), linear-gradient(90deg, #1E1E35 1px, transparent 1px)', backgroundSize: '64px 64px' }} />
+      </div>
+
+      {/* Nav */}
+      <nav className="relative z-20 max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B35] to-[#FF3D00] flex items-center justify-center shadow-lg shadow-orange-500/30">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
-          <h1 className="text-3xl font-display font-700 text-white">
-            Bosh Panel
+          <div>
+            <div className="font-display font-800 text-lg text-white tracking-tight leading-none">Dunyabunya</div>
+            <div className="text-[10px] font-mono text-[#FF6B35] uppercase tracking-widest mt-0.5">Replix AI</div>
+          </div>
+        </div>
+        <div className="hidden md:flex items-center gap-1">
+          <a href="#features" className="px-4 py-2 text-sm font-mono text-[#9494B8] hover:text-white transition-colors">Imkoniyatlar</a>
+          <a href="#yordam" className="px-4 py-2 text-sm font-mono text-[#9494B8] hover:text-white transition-colors">Yordam</a>
+          <a href="#boglanish" className="px-4 py-2 text-sm font-mono text-[#9494B8] hover:text-white transition-colors">Bog'lanish</a>
+          <a href="#kirish" className="ml-2 px-4 py-2 text-sm font-display font-600 text-white bg-[#FF6B35] hover:bg-[#FF5520] rounded-lg transition-colors">Kirish</a>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 pt-12 pb-20 grid lg:grid-cols-2 gap-12 items-center">
+        {/* Left — pitch */}
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FF6B35]/10 border border-[#FF6B35]/20 mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B35] animate-pulse" />
+            <span className="text-xs font-mono text-[#FF6B35] uppercase tracking-wider">Sun'iy intellekt bilan savdo tahlili</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-800 text-white leading-[1.05] tracking-tight">
+            Savdo qo'ng'iroqlaringizni{' '}
+            <span className="bg-gradient-to-r from-[#FF6B35] to-[#FF9D6E] bg-clip-text text-transparent">AI tahlil qiladi</span>
           </h1>
-          <p className="text-[#9494B8] font-mono text-sm mt-1">
-            Dunyabunya — AI savdo tahlili
+          <p className="mt-6 text-base md:text-lg font-mono text-[#9494B8] leading-relaxed max-w-xl">
+            Replix AI — managerlaringizning har bir qo'ng'irog'ini tinglaydi, baholaydi va
+            aniq maslahat beradi: <span className="text-[#E8E8F5]">qayerda xato qildi va nima deyishi kerak edi.</span>
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a href="#kirish" className="px-6 py-3 bg-[#FF6B35] hover:bg-[#FF5520] text-white font-display font-600 rounded-xl transition-colors shadow-lg shadow-orange-500/20">
+              Tizimga kirish →
+            </a>
+            <a href="#features" className="px-6 py-3 bg-[#111122] border border-[#1E1E35] hover:border-[#FF6B35]/30 text-[#E8E8F5] font-display font-600 rounded-xl transition-colors">
+              Imkoniyatlar
+            </a>
+          </div>
+          <div className="mt-10 flex items-center gap-8">
+            {[
+              { v: 'Whisper AI', l: 'Ovoz tanish' },
+              { v: 'GPT tahlil', l: 'Chuqur baho' },
+              { v: 'O\'zbekcha', l: 'To\'liq qo\'llab-quvvatlash' },
+            ].map(s => (
+              <div key={s.l}>
+                <div className="text-sm font-display font-700 text-white">{s.v}</div>
+                <div className="text-xs font-mono text-[#5555AA] mt-0.5">{s.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right — login panel */}
+        <div id="kirish" className="lg:justify-self-end w-full max-w-md scroll-mt-24">
+          <div className="relative">
+            <div className="absolute -inset-0.5 bg-gradient-to-br from-[#FF6B35]/40 to-transparent rounded-2xl blur opacity-60" />
+            <div className="relative bg-[#0D0D1A]/95 backdrop-blur-xl border border-[#1E1E35] rounded-2xl p-8 shadow-2xl">
+              <div className="flex items-center gap-2.5 mb-1">
+                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#FF3D00] flex items-center justify-center">
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h6a3 3 0 013 3v1" />
+                  </svg>
+                </div>
+                <h2 className="text-lg font-display font-700 text-white">Tizimga kirish</h2>
+              </div>
+              <p className="text-xs font-mono text-[#5555AA] mb-6">Akkauntingiz bilan davom eting</p>
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Email</label>
+                  <input
+                    type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="admin@dunyabunya.uz" required disabled={loading}
+                    className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-4 py-3 focus:outline-none transition-colors disabled:opacity-50 placeholder-[#333360]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Parol</label>
+                  <input
+                    type="password" value={password} onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••" required disabled={loading}
+                    className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-4 py-3 focus:outline-none transition-colors disabled:opacity-50 placeholder-[#333360]"
+                  />
+                </div>
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5">
+                    <p className="text-sm font-mono text-red-400">{error}</p>
+                  </div>
+                )}
+                <button
+                  type="submit" disabled={loading || !email || !password}
+                  className="w-full py-3 bg-[#FF6B35] hover:bg-[#FF5520] disabled:opacity-40 disabled:cursor-not-allowed text-white font-display font-600 rounded-lg transition-colors shadow-lg shadow-orange-500/20"
+                >
+                  {loading ? 'Kirilmoqda...' : 'Kirish'}
+                </button>
+              </form>
+              <p className="mt-5 text-center text-[11px] font-mono text-[#333360]">
+                Akkauntingiz yo'qmi? Administrator bilan bog'laning
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section id="features" className="relative z-10 max-w-7xl mx-auto px-6 py-20 scroll-mt-20">
+        <div className="text-center mb-14">
+          <div className="text-xs font-mono text-[#FF6B35] uppercase tracking-widest mb-3">Imkoniyatlar</div>
+          <h2 className="text-3xl md:text-4xl font-display font-800 text-white">Replix AI nimalar qila oladi?</h2>
+          <p className="mt-3 font-mono text-sm text-[#9494B8] max-w-2xl mx-auto">
+            Savdo jamoangizning samaradorligini oshirish uchun kerakli barcha vositalar
           </p>
         </div>
-        <Link
-          href="/calls"
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B35] hover:bg-[#FF5520] text-white text-sm font-display font-600 rounded-lg transition-colors shadow-lg shadow-orange-500/20"
-        >
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Qo'ng'iroq Yuklash
-        </Link>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((card) => (
-          <div
-            key={card.label}
-            className={`bg-gradient-to-br ${card.color} border ${card.border} rounded-xl p-5 transition-all hover:scale-[1.02]`}
-          >
-            <div className="text-2xl mb-3">{card.icon}</div>
-            <div className="text-2xl font-display font-700 text-white">{card.value}</div>
-            <div className="text-xs font-mono text-[#9494B8] mt-1">{card.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main content grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Recent Calls */}
-        <div className="xl:col-span-2 bg-[#0D0D1A] border border-[#1E1E35] rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#1E1E35] flex items-center justify-between">
-            <h2 className="font-display font-600 text-white">So'nggi Qo'ng'iroqlar</h2>
-            <Link href="/calls" className="text-xs font-mono text-[#FF6B35] hover:text-[#FF9D6E] transition-colors">
-              Barchasi →
-            </Link>
-          </div>
-
-          {recentCalls.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <div className="text-4xl mb-3">📞</div>
-              <p className="text-[#5555AA] font-mono text-sm">
-                Hali qo'ng'iroqlar yuklenmagan
-              </p>
-              <Link href="/calls" className="mt-3 inline-block text-xs text-[#FF6B35] hover:underline">
-                Birinchi qo'ng'iroqni yuklash →
-              </Link>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {FEATURES.map(f => (
+            <div key={f.title} className="group bg-[#0D0D1A] border border-[#1E1E35] hover:border-[#FF6B35]/30 rounded-2xl p-6 transition-all hover:-translate-y-1">
+              <div className="w-12 h-12 rounded-xl bg-[#FF6B35]/10 border border-[#FF6B35]/20 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                {f.icon}
+              </div>
+              <h3 className="font-display font-700 text-white text-lg mb-2">{f.title}</h3>
+              <p className="font-mono text-xs text-[#9494B8] leading-relaxed">{f.desc}</p>
             </div>
-          ) : (
-            <div className="divide-y divide-[#1E1E35]">
-              {recentCalls.map((call) => (
-                <div key={call.id} className="px-6 py-4 hover:bg-[#111122] transition-colors">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FF3D00]/10 border border-[#FF6B35]/20 flex items-center justify-center text-xs font-display font-600 text-[#FF6B35]">
-                        {call.manager.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="text-sm font-display font-500 text-white">
-                          {call.manager.name}
-                        </div>
-                        <div className="text-xs font-mono text-[#5555AA]">
-                          {format(new Date(call.createdAt), 'dd.MM HH:mm')}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <OutcomeBadge outcome={call.callOutcome} />
-                      <StarRatingDisplay rating={call.rating} />
-                    </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Yordam */}
+      <section id="yordam" className="relative z-10 max-w-7xl mx-auto px-6 py-20 scroll-mt-20">
+        <div className="bg-gradient-to-br from-[#0D0D1A] to-[#0D0D1A]/50 border border-[#1E1E35] rounded-3xl p-8 md:p-12">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="text-xs font-mono text-[#FF6B35] uppercase tracking-widest mb-3">Yordam</div>
+              <h2 className="text-3xl md:text-4xl font-display font-800 text-white leading-tight">
+                Qanday ishlaydi?
+              </h2>
+              <p className="mt-4 font-mono text-sm text-[#9494B8] leading-relaxed">
+                Replix AI bilan ishlash juda oddiy. 4 ta qadamda savdo qo'ng'iroqlaringizni
+                professional darajada tahlil qiling.
+              </p>
+              <a href="#kirish" className="mt-6 inline-block px-5 py-2.5 bg-[#FF6B35] hover:bg-[#FF5520] text-white font-display font-600 rounded-lg transition-colors">
+                Hozir boshlash →
+              </a>
+            </div>
+            <div className="space-y-3">
+              {HELP_STEPS.map(s => (
+                <div key={s.n} className="flex items-start gap-4 bg-[#111122] border border-[#1E1E35] rounded-xl p-4">
+                  <div className="text-xl font-display font-800 text-[#FF6B35]/40 shrink-0">{s.n}</div>
+                  <div>
+                    <div className="font-display font-600 text-white text-sm">{s.t}</div>
+                    <div className="font-mono text-xs text-[#9494B8] mt-0.5">{s.d}</div>
                   </div>
-                  {call.summary && (
-                    <p className="mt-2 text-xs font-mono text-[#9494B8] line-clamp-2 pl-11">
-                      {call.summary}
-                    </p>
-                  )}
                 </div>
               ))}
             </div>
-          )}
-        </div>
-
-        {/* Manager Leaderboard */}
-        <div className="bg-[#0D0D1A] border border-[#1E1E35] rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#1E1E35] flex items-center justify-between">
-            <h2 className="font-display font-600 text-white">Managerlar</h2>
-            <Link href="/managers" className="text-xs font-mono text-[#FF6B35] hover:text-[#FF9D6E] transition-colors">
-              Barchasi →
-            </Link>
           </div>
-
-          {managers.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <div className="text-4xl mb-3">👥</div>
-              <p className="text-[#5555AA] font-mono text-sm">Manager qo'shilmagan</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-[#1E1E35]">
-              {managers.map((mgr, idx) => {
-                const avg = mgr.calls.length > 0
-                  ? mgr.calls.reduce((s, c) => s + (c.rating || 0), 0) / mgr.calls.length
-                  : 0
-                const sales = mgr.calls.filter(c => c.callOutcome === 'sale').length
-
-                return (
-                  <Link
-                    key={mgr.id}
-                    href={`/managers/${mgr.id}`}
-                    className="flex items-center gap-3 px-6 py-3.5 hover:bg-[#111122] transition-colors"
-                  >
-                    <span className="text-xs font-mono text-[#333360] w-4">#{idx + 1}</span>
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FF3D00]/10 border border-[#FF6B35]/20 flex items-center justify-center text-xs font-display font-600 text-[#FF6B35] flex-shrink-0">
-                      {mgr.name.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-display font-500 text-white truncate">
-                        {mgr.name}
-                      </div>
-                      <div className="text-xs font-mono text-[#5555AA]">
-                        {mgr.calls.length} ta | {sales} sotuv
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-sm font-mono font-500 ${avg >= 4 ? 'text-green-400' : avg >= 3 ? 'text-yellow-400' : avg > 0 ? 'text-red-400' : 'text-[#333360]'}`}>
-                        {avg > 0 ? avg.toFixed(1) : '—'}
-                      </div>
-                      <div className="text-[10px] text-[#5555AA]">baho</div>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
-          )}
         </div>
-      </div>
+      </section>
+
+      {/* Bog'lanish */}
+      <section id="boglanish" className="relative z-10 max-w-7xl mx-auto px-6 py-20 scroll-mt-20">
+        <div className="text-center mb-12">
+          <div className="text-xs font-mono text-[#FF6B35] uppercase tracking-widest mb-3">Bog'lanish</div>
+          <h2 className="text-3xl md:text-4xl font-display font-800 text-white">Biz bilan aloqa</h2>
+          <p className="mt-3 font-mono text-sm text-[#9494B8]">Savollaringiz bormi? Biz yordam beramiz</p>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-5 max-w-3xl mx-auto">
+          {[
+            { icon: '📞', label: 'Telefon', value: '+998 50 099 97 33' },
+            { icon: '✉️', label: 'Email', value: 'support@dunyabunya.uz' },
+            { icon: '💬', label: 'Telegram', value: '@dunyabunya' },
+          ].map(c => (
+            <div key={c.label} className="bg-[#0D0D1A] border border-[#1E1E35] hover:border-[#FF6B35]/30 rounded-2xl p-6 text-center transition-colors">
+              <div className="text-3xl mb-3">{c.icon}</div>
+              <div className="text-xs font-mono text-[#5555AA] uppercase tracking-wider mb-1">{c.label}</div>
+              <div className="font-display font-600 text-white text-sm">{c.value}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-[#1E1E35] mt-10">
+        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#FF3D00] flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <span className="font-display font-700 text-white text-sm">Dunyabunya × Replix AI</span>
+          </div>
+          <p className="font-mono text-xs text-[#333360]">© 2026 Dunyabunya savdo platformasi. Barcha huquqlar himoyalangan.</p>
+        </div>
+      </footer>
     </div>
   )
 }

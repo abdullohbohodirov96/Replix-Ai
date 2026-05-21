@@ -36,7 +36,7 @@ const comingSoonItems = [
 
 const navItems = [
   {
-    href: '/',
+    href: '/dashboard',
     label: 'Dashboard',
     adminOnly: false,
     icon: (

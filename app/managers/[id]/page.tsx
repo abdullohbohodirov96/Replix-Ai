@@ -102,7 +102,7 @@ export default async function ManagerDetailPage({
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-mono text-[#5555AA]">
-        <Link href="/" className="hover:text-[#FF6B35] transition-colors">Dashboard</Link>
+        <Link href="/dashboard" className="hover:text-[#FF6B35] transition-colors">Dashboard</Link>
         <span>/</span>
         <Link href="/managers" className="hover:text-[#FF6B35] transition-colors">Managerlar</Link>
         <span>/</span>

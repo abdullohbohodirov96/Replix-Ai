@@ -6,9 +6,9 @@ import ChatBot from './ChatBot'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isLogin = pathname === '/login'
+  const isPublic = pathname === '/login' || pathname === '/'
 
-  if (isLogin) {
+  if (isPublic) {
     return <>{children}</>
   }
 
