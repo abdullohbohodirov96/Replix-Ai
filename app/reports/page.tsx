@@ -66,7 +66,7 @@ export default async function ReportsPage() {
       acc[p] = (acc[p] || 0) + 1
       return acc
     }, {} as Record<string, number>)
-    const topProblems = Object.entries(problemFreq).sort(([,a],[,b]) => b-a).slice(0,3)
+    const topProblems = Object.entries(problemFreq).sort(([,a],[,b]) => (b as number)-(a as number)).slice(0,3)
 
     return { manager: mgr, todayCalls, allCalls, avgRating, todayAvg, topProblems }
   })

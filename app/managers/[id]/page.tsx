@@ -85,7 +85,7 @@ export default async function ManagerDetailPage({
     return acc
   }, {} as Record<string, number>)
   const topProblems = Object.entries(problemFreq)
-    .sort(([, a], [, b]) => b - a)
+    .sort(([, a], [, b]) => (b as number) - (a as number))
     .slice(0, 5)
 
   const ratingColor = avgRating >= 4 ? '#10B981' : avgRating >= 3 ? '#F59E0B' : avgRating > 0 ? '#EF4444' : '#333360'
