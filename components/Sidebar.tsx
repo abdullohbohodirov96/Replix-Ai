@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
 
 const navItems = [
   {
     href: '/',
     label: 'Dashboard',
+    adminOnly: false,
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -17,6 +19,7 @@ const navItems = [
   {
     href: '/managers',
     label: 'Managerlar',
+    adminOnly: false,
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -27,6 +30,7 @@ const navItems = [
   {
     href: '/calls',
     label: "Qo'ng'iroqlar",
+    adminOnly: false,
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -37,6 +41,7 @@ const navItems = [
   {
     href: '/reports',
     label: 'Hisobotlar',
+    adminOnly: false,
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -45,8 +50,20 @@ const navItems = [
     ),
   },
   {
+    href: '/admin/users',
+    label: 'Foydalanuvchilar',
+    adminOnly: true,
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>
+    ),
+  },
+  {
     href: '/admin',
     label: 'Yordam',
+    adminOnly: true,
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -58,6 +75,11 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const role = (session?.user as { role?: string })?.role
+  const isAdmin = role === 'admin'
+
+  const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin)
 
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-[#0D0D1A] border-r border-[#1E1E35] z-50 hidden lg:flex flex-col">
@@ -65,8 +87,8 @@ export default function Sidebar() {
       <div className="px-6 py-6 border-b border-[#1E1E35]">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#FF6B35] to-[#FF3D00] flex items-center justify-center shadow-lg shadow-orange-500/20">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round" stroke="white" strokeWidth="2" fill="none"/>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round" stroke="white" strokeWidth="2"/>
             </svg>
           </div>
           <div>
@@ -89,11 +111,11 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || 
+      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+        {visibleItems.map((item) => {
+          const isActive = pathname === item.href ||
             (item.href !== '/' && pathname.startsWith(item.href))
-          
+
           return (
             <Link
               key={item.href}
@@ -111,7 +133,12 @@ export default function Sidebar() {
                 {item.icon}
               </span>
               <span className="font-display">{item.label}</span>
-              {isActive && (
+              {item.adminOnly && (
+                <span className="ml-auto text-[9px] font-mono bg-[#FF6B35]/10 text-[#FF6B35] px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  Admin
+                </span>
+              )}
+              {isActive && !item.adminOnly && (
                 <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#FF6B35]" />
               )}
             </Link>
@@ -119,13 +146,39 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-6 py-4 border-t border-[#1E1E35]">
-        <div className="text-[10px] font-mono text-[#333360] text-center">
-          <div>Dunyabunya <span className="text-[#FF6B35]/60">× Replix AI</span></div>
-          <div className="mt-0.5">v1.0.0</div>
+      {/* User info + logout */}
+      {session?.user && (
+        <div className="px-4 py-4 border-t border-[#1E1E35]">
+          <div className="flex items-center gap-3 px-3 py-2.5 bg-[#111122] rounded-lg border border-[#1E1E35] mb-2">
+            <div className="w-8 h-8 rounded-full bg-[#FF6B35]/10 border border-[#FF6B35]/20 flex items-center justify-center text-xs font-display font-600 text-[#FF6B35] shrink-0">
+              {(session.user.name || session.user.email || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-display text-white truncate">{session.user.name || 'Foydalanuvchi'}</div>
+              <div className="text-[10px] font-mono text-[#5555AA] truncate">{isAdmin ? 'Admin' : 'User'}</div>
+            </div>
+          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-mono text-[#5555AA] hover:text-red-400 hover:bg-red-500/5 transition-colors"
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Chiqish
+          </button>
         </div>
-      </div>
+      )}
+
+      {/* Footer */}
+      {!session?.user && (
+        <div className="px-6 py-4 border-t border-[#1E1E35]">
+          <div className="text-[10px] font-mono text-[#333360] text-center">
+            <div>Dunyabunya <span className="text-[#FF6B35]/60">× Replix AI</span></div>
+            <div className="mt-0.5">v1.0.0</div>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

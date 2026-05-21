@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import Sidebar from '@/components/Sidebar'
-import ChatBot from '@/components/ChatBot'
+import AppShell from '@/components/AppShell'
+import Providers from '@/components/Providers'
 
 export const metadata: Metadata = {
   title: 'Dunyabunya — Replix AI Analytics',
@@ -27,15 +27,9 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-[#080810] text-[#E8E8F5] font-sans antialiased">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 lg:ml-64 min-h-screen">
-            <div className="p-4 md:p-8 animate-fade-in">
-              {children}
-            </div>
-          </main>
-          <ChatBot />
-        </div>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   )
