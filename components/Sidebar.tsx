@@ -4,6 +4,36 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 
+const comingSoonItems = [
+  {
+    label: 'KPI & Maqsadlar',
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Bo\'limlar',
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Trening',
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    ),
+  },
+]
+
 const navItems = [
   {
     href: '/',
@@ -145,6 +175,21 @@ export default function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Coming soon items */}
+      <div className="px-4 pb-2">
+        <div className="text-[9px] font-mono text-[#333360] uppercase tracking-widest px-3 mb-1">Tez kunda</div>
+        {comingSoonItems.map(item => (
+          <div key={item.label}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm opacity-30 cursor-not-allowed select-none">
+            <span className="text-[#5555AA]">{item.icon}</span>
+            <span className="font-display text-[#9494B8]">{item.label}</span>
+            <span className="ml-auto text-[9px] font-mono bg-[#1E1E35] text-[#5555AA] px-1.5 py-0.5 rounded uppercase tracking-wider">
+              Bravo
+            </span>
+          </div>
+        ))}
+      </div>
 
       {/* User info + logout */}
       {session?.user && (

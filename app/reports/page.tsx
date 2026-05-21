@@ -1,12 +1,15 @@
 import { prisma } from '@/lib/prisma'
 import { format, startOfDay, endOfDay } from 'date-fns'
 import GenerateReportButton from '@/components/GenerateReportButton'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-async function getReportsData() {
+async function getReportsData(managerId?: string | null) {
   const managers = await prisma.manager.findMany({
+    where: managerId ? { id: managerId } : undefined,
     include: {
       calls: {
         orderBy: { createdAt: 'desc' },
@@ -42,7 +45,10 @@ function RatingBar({ value, max = 5 }: { value: number; max?: number }) {
 }
 
 export default async function ReportsPage() {
-  const managers = await getReportsData()
+  const session = await getServerSession(authOptions)
+  const sessionUser = session?.user as { role?: string; managerId?: string | null } | undefined
+  const isAdmin = sessionUser?.role === 'admin'
+  const managers = await getReportsData(isAdmin ? null : sessionUser?.managerId)
 
   // Today's stats per manager
   const today = new Date()

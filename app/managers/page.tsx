@@ -2,12 +2,15 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import AddManagerModal from '@/components/AddManagerModal'
 import DeleteManagerButton from '@/components/DeleteManagerButton'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-async function getManagers() {
+async function getManagers(managerId?: string | null) {
   return prisma.manager.findMany({
+    where: managerId ? { id: managerId } : undefined,
     include: {
       calls: {
         select: {
@@ -119,7 +122,10 @@ function ManagerCard({ manager }: { manager: Awaited<ReturnType<typeof getManage
 }
 
 export default async function ManagersPage() {
-  const managers = await getManagers()
+  const session = await getServerSession(authOptions)
+  const sessionUser = session?.user as { role?: string; managerId?: string | null } | undefined
+  const isAdmin = sessionUser?.role === 'admin'
+  const managers = await getManagers(isAdmin ? null : sessionUser?.managerId)
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -134,18 +140,22 @@ export default async function ManagersPage() {
             {managers.length} ta manager ro'yxatda
           </p>
         </div>
-        <AddManagerModal />
+        {isAdmin && <AddManagerModal />}
       </div>
 
       {/* Grid */}
       {managers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 bg-[#0D0D1A] border border-[#1E1E35] rounded-xl">
           <div className="text-5xl mb-4">👥</div>
-          <h3 className="font-display font-600 text-white text-lg mb-2">Manager qo'shilmagan</h3>
+          <h3 className="font-display font-600 text-white text-lg mb-2">
+            {isAdmin ? 'Manager qo\'shilmagan' : 'Sizga manager biriktirilmagan'}
+          </h3>
           <p className="text-[#5555AA] font-mono text-sm mb-6 text-center max-w-xs">
-            Birinchi managerni qo'shing va qo'ng'iroqlarini tahlil qilishni boshlang
+            {isAdmin
+              ? 'Birinchi managerni qo\'shing va qo\'ng\'iroqlarini tahlil qilishni boshlang'
+              : 'Admin sizga manager biriktirib qo\'yadi'}
           </p>
-          <AddManagerModal />
+          {isAdmin && <AddManagerModal />}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">

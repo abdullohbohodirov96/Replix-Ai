@@ -13,12 +13,13 @@ model Manager {
   name        String
   phone       String?
   email       String?
-  avatar      String?  // initials color
+  avatar      String?
   position    String?  @default("Sales Manager")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   calls       Call[]
   reports     DailyReport[]
+  users       User[]
 }
 
 model Call {
@@ -27,15 +28,15 @@ model Call {
   manager         Manager   @relation(fields: [managerId], references: [id], onDelete: Cascade)
   audioFileName   String
   audioPath       String
-  duration        Int?      // seconds
-  transcription   String?   // Uzbek transcription
-  analysis        String?   // GPT analysis in Uzbek
-  rating          Float?    // 1.0 - 5.0 stars
-  problems        String?   // JSON array of problems
-  positives       String?   // JSON array of positives
-  clientSentiment String?   // "positive" | "negative" | "neutral"
-  callOutcome     String?   // "sale" | "followup" | "rejected" | "unknown"
-  summary         String?   // short summary in Uzbek
+  duration        Int?
+  transcription   String?
+  analysis        String?
+  rating          Float?
+  problems        String?
+  positives       String?
+  clientSentiment String?
+  callOutcome     String?
+  summary         String?
   createdAt       DateTime  @default(now())
   callDate        DateTime  @default(now())
 }
@@ -47,7 +48,7 @@ model DailyReport {
   date          DateTime
   totalCalls    Int      @default(0)
   avgRating     Float    @default(0)
-  topProblems   String?  // JSON
+  topProblems   String?
   summary       String?
   improvement   String?
   createdAt     DateTime @default(now())
@@ -61,6 +62,8 @@ model User {
   email     String   @unique
   password  String
   role      String   @default("user")
+  managerId String?
+  manager   Manager? @relation(fields: [managerId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

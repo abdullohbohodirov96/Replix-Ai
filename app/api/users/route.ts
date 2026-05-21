@@ -12,7 +12,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Ruxsat yo\'q' }, { status: 403 })
   }
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    select: {
+      id: true, name: true, email: true, role: true, createdAt: true,
+      managerId: true,
+      manager: { select: { id: true, name: true } },
+    },
     orderBy: { createdAt: 'asc' },
   })
   return NextResponse.json(users)
@@ -24,7 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Ruxsat yo\'q' }, { status: 403 })
   }
 
-  const { name, email, password, role } = await request.json()
+  const { name, email, password, role, managerId } = await request.json()
   if (!name || !email || !password) {
     return NextResponse.json({ error: 'Barcha maydonlar to\'ldirilishi shart' }, { status: 400 })
   }
@@ -36,8 +40,12 @@ export async function POST(request: NextRequest) {
 
   const hashed = await bcrypt.hash(password, 10)
   const user = await prisma.user.create({
-    data: { name, email, password: hashed, role: role || 'user' },
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    data: {
+      name, email, password: hashed,
+      role: role || 'user',
+      managerId: managerId || null,
+    },
+    select: { id: true, name: true, email: true, role: true, createdAt: true, managerId: true },
   })
   return NextResponse.json(user)
 }

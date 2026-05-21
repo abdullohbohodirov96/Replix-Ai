@@ -3,19 +3,25 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import UploadCallModal from '@/components/UploadCallModal'
 import DeleteCallButton from '@/components/DeleteCallButton'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-async function getCalls() {
+async function getCalls(managerId?: string | null) {
   return prisma.call.findMany({
+    where: managerId ? { managerId } : undefined,
     include: { manager: true },
     orderBy: { createdAt: 'desc' },
   })
 }
 
-async function getManagers() {
-  return prisma.manager.findMany({ orderBy: { name: 'asc' } })
+async function getManagers(managerId?: string | null) {
+  return prisma.manager.findMany({
+    where: managerId ? { id: managerId } : undefined,
+    orderBy: { name: 'asc' },
+  })
 }
 
 function StarDisplay({ rating }: { rating: number | null }) {
@@ -42,7 +48,11 @@ function OutcomeBadge({ outcome }: { outcome: string | null }) {
 }
 
 export default async function CallsPage() {
-  const [calls, managers] = await Promise.all([getCalls(), getManagers()])
+  const session = await getServerSession(authOptions)
+  const sessionUser = session?.user as { role?: string; managerId?: string | null } | undefined
+  const isAdmin = sessionUser?.role === 'admin'
+  const filterManagerId = isAdmin ? null : sessionUser?.managerId
+  const [calls, managers] = await Promise.all([getCalls(filterManagerId), getManagers(filterManagerId)])
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -57,7 +67,7 @@ export default async function CallsPage() {
             Jami {calls.length} ta qo'ng'iroq
           </p>
         </div>
-        <UploadCallModal managers={managers} />
+        {isAdmin && <UploadCallModal managers={managers} />}
       </div>
 
       {/* Table */}
@@ -69,7 +79,7 @@ export default async function CallsPage() {
             <p className="text-[#5555AA] font-mono text-sm mb-6">
               Birinchi audio qo'ng'iroqni yuklang va AI tahlilini oling
             </p>
-            <UploadCallModal managers={managers} />
+            {isAdmin && <UploadCallModal managers={managers} />}
           </div>
         ) : (
           <div className="overflow-x-auto">

@@ -10,11 +10,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (!session || (session.user as { role?: string }).role !== 'admin') {
     return NextResponse.json({ error: 'Ruxsat yo\'q' }, { status: 403 })
   }
-  const { role } = await request.json()
+  const body = await request.json()
+  const data: { role?: string; managerId?: string | null } = {}
+  if (body.role !== undefined) data.role = body.role
+  if (body.managerId !== undefined) data.managerId = body.managerId || null
+
   const user = await prisma.user.update({
     where: { id: params.id },
-    data: { role },
-    select: { id: true, name: true, email: true, role: true },
+    data,
+    select: { id: true, name: true, email: true, role: true, managerId: true },
   })
   return NextResponse.json(user)
 }
