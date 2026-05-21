@@ -148,7 +148,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card) => (
           <div
             key={card.label}
@@ -162,9 +162,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* Main content grid */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Recent Calls */}
-        <div className="col-span-2 bg-[#0D0D1A] border border-[#1E1E35] rounded-xl overflow-hidden">
+        <div className="xl:col-span-2 bg-[#0D0D1A] border border-[#1E1E35] rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-[#1E1E35] flex items-center justify-between">
             <h2 className="font-display font-600 text-white">So'nggi Qo'ng'iroqlar</h2>
             <Link href="/calls" className="text-xs font-mono text-[#FF6B35] hover:text-[#FF9D6E] transition-colors">

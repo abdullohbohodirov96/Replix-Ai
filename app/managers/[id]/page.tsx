@@ -126,7 +126,7 @@ export default async function ManagerDetailPage({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
         <div className="bg-[#0D0D1A] border border-[#1E1E35] rounded-xl p-4 text-center">
           <div className="text-2xl font-display font-700 text-white">{calls.length}</div>
           <div className="text-xs font-mono text-[#5555AA] mt-1">Jami</div>
@@ -152,9 +152,9 @@ export default async function ManagerDetailPage({
       </div>
 
       {/* Two column layout */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Calls List */}
-        <div className="col-span-2 space-y-4">
+        <div className="xl:col-span-2 space-y-4">
           <h2 className="font-display font-600 text-white text-lg">
             Qo'ng'iroqlar tarixı
           </h2>

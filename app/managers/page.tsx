@@ -143,7 +143,7 @@ export default async function ManagersPage() {
           <AddManagerModal />
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {managers.map(mgr => (
             <ManagerCard key={mgr.id} manager={mgr} />
           ))}

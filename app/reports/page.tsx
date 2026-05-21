@@ -88,7 +88,7 @@ export default async function ReportsPage() {
       </div>
 
       {/* Overall summary */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Managerlar', value: managers.length, icon: '👥' },
           { label: 'Jami qo\'ng\'iroq', value: managers.reduce((s, m) => s + m.calls.length, 0), icon: '📞' },
@@ -126,7 +126,7 @@ export default async function ReportsPage() {
             <p className="text-[#5555AA] font-mono text-sm">Managerlar qo'shilmagan</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {todayStats.map(({ manager, todayCalls, allCalls, avgRating, todayAvg, topProblems }) => (
               <div key={manager.id} className="bg-[#0D0D1A] border border-[#1E1E35] rounded-xl overflow-hidden">
                 {/* Manager header */}

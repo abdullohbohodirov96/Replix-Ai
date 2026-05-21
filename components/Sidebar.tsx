@@ -50,7 +50,7 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-[#0D0D1A] border-r border-[#1E1E35] z-50 flex flex-col">
+    <aside className="fixed left-0 top-0 h-full w-64 bg-[#0D0D1A] border-r border-[#1E1E35] z-50 hidden lg:flex flex-col">
       {/* Logo */}
       <div className="px-6 py-6 border-b border-[#1E1E35]">
         <div className="flex items-center gap-3">

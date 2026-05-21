@@ -28,8 +28,8 @@ export default function RootLayout({
       <body className="bg-[#080810] text-[#E8E8F5] font-sans antialiased">
         <div className="flex min-h-screen">
           <Sidebar />
-          <main className="flex-1 ml-64 min-h-screen">
-            <div className="p-8 animate-fade-in">
+          <main className="flex-1 lg:ml-64 min-h-screen">
+            <div className="p-4 md:p-8 animate-fade-in">
               {children}
             </div>
           </main>

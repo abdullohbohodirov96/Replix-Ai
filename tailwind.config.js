@@ -26,7 +26,7 @@ module.exports = {
         text: {
           primary: '#E8E8F5',
           secondary: '#9494B8',
-          muted: '#5555778',
+          muted: '#555577',
           accent: '#FF6B35',
         },
         status: {
@@ -41,6 +41,12 @@ module.exports = {
         body: ['var(--font-dm-mono)', 'monospace'],
         sans: ['var(--font-syne)', 'sans-serif'],
         mono: ['var(--font-dm-mono)', 'monospace'],
+      },
+      fontWeight: {
+        '500': '500',
+        '600': '600',
+        '700': '700',
+        '800': '800',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
