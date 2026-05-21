@@ -113,8 +113,8 @@ function ManagerCard({ manager }: { manager: Awaited<ReturnType<typeof getManage
           )}
           <span className="text-xs font-mono text-[#FF6B35] ml-auto">Batafsil →</span>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   )
 }
 
