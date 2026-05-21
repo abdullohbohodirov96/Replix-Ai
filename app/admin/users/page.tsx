@@ -9,6 +9,168 @@ interface User {
   manager: { id: string; name: string } | null
 }
 
+interface EditForm {
+  name: string
+  email: string
+  password: string
+  role: string
+  managerId: string
+}
+
+function EditModal({
+  user,
+  managers,
+  onClose,
+  onSave,
+}: {
+  user: User
+  managers: Manager[]
+  onClose: () => void
+  onSave: () => void
+}) {
+  const [form, setForm] = useState<EditForm>({
+    name: user.name,
+    email: user.email,
+    password: '',
+    role: user.role,
+    managerId: user.managerId || '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+
+    const body: Record<string, unknown> = {
+      name: form.name,
+      email: form.email,
+      role: form.role,
+      managerId: form.managerId || null,
+    }
+    if (form.password.trim().length > 0) {
+      body.password = form.password.trim()
+    }
+
+    const res = await fetch(`/api/users/${user.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      setError(data.error || 'Xatolik yuz berdi')
+      setSaving(false)
+      return
+    }
+    setSaving(false)
+    onSave()
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-[#0D0D1A] border border-[#FF6B35]/20 rounded-xl p-6 w-full max-w-md shadow-2xl">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-display font-600 text-white">Foydalanuvchini tahrirlash</h3>
+          <button onClick={onClose} className="text-[#5555AA] hover:text-white transition-colors">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Ism *</label>
+            <input
+              value={form.name}
+              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+              placeholder="To'liq ism"
+              required
+              disabled={saving}
+              className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-3 py-2.5 focus:outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Email *</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+              placeholder="user@dunyabunya.uz"
+              required
+              disabled={saving}
+              className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-3 py-2.5 focus:outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Yangi parol (ixtiyoriy)</label>
+            <input
+              type="password"
+              value={form.password}
+              onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+              placeholder="Yangi parol (ixtiyoriy)"
+              disabled={saving}
+              className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-3 py-2.5 focus:outline-none transition-colors"
+            />
+            <p className="text-[10px] font-mono text-[#5555AA] mt-1">Bo&apos;sh qoldirilsa parol o&apos;zgarmaydi (kamida 6 ta belgi)</p>
+          </div>
+          <div>
+            <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">Rol *</label>
+            <select
+              value={form.role}
+              onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+              disabled={saving}
+              className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-3 py-2.5 focus:outline-none transition-colors"
+            >
+              <option value="user">Oddiy foydalanuvchi</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-mono text-[#9494B8] uppercase tracking-wider mb-1.5 block">
+              Manager biriktirilsin
+            </label>
+            <select
+              value={form.managerId}
+              onChange={e => setForm(p => ({ ...p, managerId: e.target.value }))}
+              disabled={saving}
+              className="w-full bg-[#111122] border border-[#1E1E35] focus:border-[#FF6B35] text-[#E8E8F5] font-mono text-sm rounded-lg px-3 py-2.5 focus:outline-none transition-colors"
+            >
+              <option value="">— Manager biriktirilmagan —</option>
+              {managers.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2">
+              <p className="text-sm font-mono text-red-400">{error}</p>
+            </div>
+          )}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 bg-[#161628] text-[#9494B8] text-sm font-display rounded-lg hover:bg-[#1E1E35] transition-colors"
+            >
+              Bekor
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 py-2.5 bg-[#FF6B35] hover:bg-[#FF5520] disabled:opacity-40 text-white text-sm font-display font-600 rounded-lg transition-colors"
+            >
+              {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [managers, setManagers] = useState<Manager[]>([])
@@ -17,6 +179,7 @@ export default function UsersPage() {
   const [error, setError] = useState('')
   const [adding, setAdding] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
 
   const load = useCallback(async () => {
     const [uRes, mRes] = await Promise.all([fetch('/api/users'), fetch('/api/managers')])
@@ -68,6 +231,15 @@ export default function UsersPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {editingUser && (
+        <EditModal
+          user={editingUser}
+          managers={managers}
+          onClose={() => setEditingUser(null)}
+          onSave={load}
+        />
+      )}
+
       <div className="flex items-start justify-between">
         <div>
           <div className="text-xs font-mono text-[#FF6B35] uppercase tracking-widest mb-1">Admin / Foydalanuvchilar</div>
@@ -189,12 +361,23 @@ export default function UsersPage() {
                       {new Date(user.createdAt).toLocaleDateString('uz-UZ')}
                     </td>
                     <td className="px-5 py-4">
-                      <button onClick={() => handleDelete(user.id)}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg text-[#333360] hover:text-red-400 hover:bg-red-500/10 transition-colors">
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditingUser(user)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#333360] hover:text-[#FF6B35] hover:bg-[#FF6B35]/10 transition-colors"
+                          title="Tahrirlash"
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button onClick={() => handleDelete(user.id)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#333360] hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

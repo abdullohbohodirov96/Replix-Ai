@@ -33,9 +33,10 @@ export const authOptions: NextAuthOptions = {
     },
     session({ session, token }) {
       if (session.user) {
-        const u = session.user as { role?: string; managerId?: string | null }
+        const u = session.user as { role?: string; managerId?: string | null; id?: string }
         u.role = token.role as string
         u.managerId = token.managerId as string | null
+        u.id = token.sub  // user id from JWT sub
       }
       return session
     },

@@ -6,6 +6,7 @@ import path from 'path'
 import { existsSync } from 'fs'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 // Ensure uploads directory exists
 async function ensureUploadsDir() {

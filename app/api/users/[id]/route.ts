@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import bcrypt from 'bcryptjs'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,9 +12,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: 'Ruxsat yo\'q' }, { status: 403 })
   }
   const body = await request.json()
-  const data: { role?: string; managerId?: string | null } = {}
-  if (body.role !== undefined) data.role = body.role
-  if (body.managerId !== undefined) data.managerId = body.managerId || null
+  const { role, managerId, name, email, password } = body
+
+  const data: Record<string, unknown> = {}
+  if (role !== undefined) data.role = role
+  if (managerId !== undefined) data.managerId = managerId || null
+  if (name !== undefined && name.trim()) data.name = name.trim()
+  if (email !== undefined && email.trim()) {
+    // Check email not taken by another user
+    const existing = await prisma.user.findFirst({ where: { email: email.trim(), NOT: { id: params.id } } })
+    if (existing) return NextResponse.json({ error: 'Bu email allaqachon band' }, { status: 400 })
+    data.email = email.trim()
+  }
+  if (password !== undefined && password.trim().length >= 6) {
+    data.password = await bcrypt.hash(password.trim(), 10)
+  }
 
   const user = await prisma.user.update({
     where: { id: params.id },

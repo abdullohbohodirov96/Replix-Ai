@@ -7,8 +7,9 @@ export const revalidate = 0
 
 async function getSupportMessages() {
   return prisma.supportMessage.findMany({
+    include: { user: { select: { id: true, name: true, email: true } } },
     orderBy: { createdAt: 'desc' },
-    take: 100,
+    take: 200,
   })
 }
 
@@ -16,13 +17,13 @@ export default async function AdminPage() {
   const messages = await getSupportMessages()
 
   const unreadCount = messages.filter(m => !m.isRead).length
+  const adminRequestCount = messages.filter(m => m.wantsAdmin && !m.adminReply).length
 
-  // Group by sessionId
-  const sessions = messages.reduce<
-    Record<string, typeof messages>
-  >((acc, msg) => {
-    if (!acc[msg.sessionId]) acc[msg.sessionId] = []
-    acc[msg.sessionId].push(msg)
+  // Group by userId (if logged in) or sessionId
+  const sessions = messages.reduce<Record<string, typeof messages>>((acc, msg) => {
+    const key = msg.userId || msg.sessionId
+    if (!acc[key]) acc[key] = []
+    acc[key].push(msg)
     return acc
   }, {})
 
@@ -42,6 +43,11 @@ export default async function AdminPage() {
                 {unreadCount} o&apos;qilmagan
               </span>
             )}
+            {adminRequestCount > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 bg-orange-500/20 border border-orange-500/30 text-orange-400 rounded text-xs animate-pulse">
+                ⚡ {adminRequestCount} admin so&apos;rovi
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -56,11 +62,9 @@ export default async function AdminPage() {
           <div className="text-2xl font-display font-700 text-red-400">{unreadCount}</div>
           <div className="text-xs font-mono text-[#5555AA] mt-1">O&apos;qilmagan</div>
         </div>
-        <div className="bg-[#0D0D1A] border border-[#1E1E35] rounded-xl p-4 text-center">
-          <div className="text-2xl font-display font-700 text-[#FF6B35]">
-            {Object.keys(sessions).length}
-          </div>
-          <div className="text-xs font-mono text-[#5555AA] mt-1">Sessiyalar</div>
+        <div className="bg-[#0D0D1A] border border-orange-500/20 rounded-xl p-4 text-center">
+          <div className="text-2xl font-display font-700 text-orange-400">{adminRequestCount}</div>
+          <div className="text-xs font-mono text-[#5555AA] mt-1">Admin so&apos;rovlari</div>
         </div>
       </div>
 
@@ -75,36 +79,40 @@ export default async function AdminPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {Object.entries(sessions).map(([sid, sessionMsgs]) => {
+          {Object.entries(sessions).map(([, sessionMsgs]) => {
             const latestMsg = sessionMsgs[0]
             const hasUnread = sessionMsgs.some(m => !m.isRead)
-            const shortSid = sid.slice(-8)
+            const hasAdminRequest = sessionMsgs.some(m => m.wantsAdmin && !m.adminReply)
+            const userInfo = sessionMsgs.find(m => m.user)?.user
+            const displayName = userInfo?.name || userInfo?.email || `Sessiya #${latestMsg.sessionId.slice(-6)}`
 
             return (
               <div
-                key={sid}
+                key={latestMsg.sessionId}
                 className={`bg-[#0D0D1A] border rounded-xl overflow-hidden ${
-                  hasUnread ? 'border-[#FF6B35]/30' : 'border-[#1E1E35]'
+                  hasAdminRequest ? 'border-orange-500/40' : hasUnread ? 'border-[#FF6B35]/30' : 'border-[#1E1E35]'
                 }`}
               >
                 {/* Session header */}
                 <div className="px-5 py-3 border-b border-[#1E1E35] flex items-center justify-between bg-[#111122]">
                   <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-[#FF6B35]/10 border border-[#FF6B35]/20 flex items-center justify-center">
-                      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#FF6B35" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-display font-600 ${hasAdminRequest ? 'bg-orange-500/20 border border-orange-500/30 text-orange-400' : 'bg-[#FF6B35]/10 border border-[#FF6B35]/20 text-[#FF6B35]'}`}>
+                      {displayName.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <span className="text-xs font-mono text-[#9494B8]">
-                        Sessiya: <span className="text-[#FF6B35]">#{shortSid}</span>
-                      </span>
-                      <span className="ml-3 text-xs font-mono text-[#5555AA]">
-                        {sessionMsgs.length} ta xabar
-                      </span>
+                      <span className="text-xs font-display text-white">{displayName}</span>
+                      {userInfo?.email && userInfo.name && (
+                        <span className="ml-2 text-[10px] font-mono text-[#5555AA]">{userInfo.email}</span>
+                      )}
+                      <span className="ml-2 text-[10px] font-mono text-[#333360]">{sessionMsgs.length} ta xabar</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {hasAdminRequest && (
+                      <span className="px-2 py-0.5 bg-orange-500/15 border border-orange-500/25 text-orange-400 text-[10px] font-mono rounded animate-pulse">
+                        ⚡ Admin so&apos;rovi
+                      </span>
+                    )}
                     {hasUnread && (
                       <span className="px-2 py-0.5 bg-red-500/15 border border-red-500/25 text-red-400 text-[10px] font-mono rounded">
                         Yangi
@@ -133,6 +141,11 @@ export default async function AdminPage() {
                             <span className="text-[10px] font-mono text-[#333360]">
                               {format(new Date(msg.createdAt), 'HH:mm')}
                             </span>
+                            {msg.wantsAdmin && (
+                              <span className="px-1.5 py-0.5 bg-orange-500/15 border border-orange-500/25 text-orange-400 text-[9px] font-mono rounded">
+                                ⚡ Admin so&apos;radi
+                              </span>
+                            )}
                             {!msg.isRead && (
                               <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
                             )}
