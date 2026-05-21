@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import UploadCallModal from '@/components/UploadCallModal'
+import DeleteCallButton from '@/components/DeleteCallButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -75,7 +76,7 @@ export default async function CallsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#1E1E35]">
-                  {['Sana', 'Manager', 'Fayl', 'Baho', 'Natija', 'Mijoz', 'Xulosa'].map(h => (
+                  {['Sana', 'Manager', 'Fayl', 'Baho', 'Natija', 'Mijoz', 'Xulosa', ''].map(h => (
                     <th key={h} className="px-5 py-3 text-left text-xs font-mono text-[#5555AA] uppercase tracking-wider">
                       {h}
                     </th>
@@ -128,6 +129,9 @@ export default async function CallsPage() {
                       ) : (
                         <span className="text-xs font-mono text-[#333360] italic">Tahlil yo'q</span>
                       )}
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <DeleteCallButton callId={call.id} />
                     </td>
                   </tr>
                 ))}

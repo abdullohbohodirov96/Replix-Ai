@@ -61,10 +61,10 @@ export default function Sidebar() {
           </div>
           <div>
             <div className="font-display font-800 text-base text-white tracking-tight">
-              Replix <span className="text-[#FF6B35]">AI</span>
+              Dunyabunya
             </div>
-            <div className="text-[10px] font-mono text-[#5555AA] uppercase tracking-widest">
-              Sales Analytics
+            <div className="text-[10px] font-mono text-[#FF6B35] uppercase tracking-widest">
+              Replix AI Analytics
             </div>
           </div>
         </div>
@@ -74,7 +74,7 @@ export default function Sidebar() {
       <div className="px-6 py-3 border-b border-[#1E1E35]">
         <div className="flex items-center gap-2 px-3 py-2 bg-[#111122] rounded-lg border border-[#1E1E35]">
           <div className="w-2 h-2 rounded-full bg-[#FF6B35] animate-pulse" />
-          <span className="text-xs font-mono text-[#9494B8] truncate">Qara Manda Qurilish</span>
+          <span className="text-xs font-mono text-[#9494B8] truncate">Dunyabunya Savdo Platforma</span>
         </div>
       </div>
 
@@ -112,8 +112,8 @@ export default function Sidebar() {
       {/* Footer */}
       <div className="px-6 py-4 border-t border-[#1E1E35]">
         <div className="text-[10px] font-mono text-[#333360] text-center">
-          <div>Replix AI v1.0.0</div>
-          <div className="mt-0.5">by <span className="text-[#FF6B35]/60">Abdulloh</span></div>
+          <div>Dunyabunya <span className="text-[#FF6B35]/60">× Replix AI</span></div>
+          <div className="mt-0.5">v1.0.0</div>
         </div>
       </div>
     </aside>

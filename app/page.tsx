@@ -133,7 +133,7 @@ export default async function DashboardPage() {
             Bosh Panel
           </h1>
           <p className="text-[#9494B8] font-mono text-sm mt-1">
-            Qara Manda qurilish — savdo tahlili
+            Dunyabunya — AI savdo tahlili
           </p>
         </div>
         <Link

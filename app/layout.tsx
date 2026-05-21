@@ -3,8 +3,8 @@ import './globals.css'
 import Sidebar from '@/components/Sidebar'
 
 export const metadata: Metadata = {
-  title: 'Replix AI — Sales Analytics',
-  description: 'Qara Manda qurilish do\'koni uchun AI-powered savdo tahlil platformasi. Abdulloh tomonidan yaratilgan.',
+  title: 'Dunyabunya — Replix AI Analytics',
+  description: 'Dunyabunya savdo platformasi uchun AI-powered qo\'ng\'iroq tahlil tizimi.',
   icons: {
     icon: '/favicon.ico',
   },

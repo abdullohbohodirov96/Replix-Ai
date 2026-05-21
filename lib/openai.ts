@@ -33,7 +33,7 @@ export async function analyzeCallTranscription(
   managerName: string
 ): Promise<CallAnalysisResult> {
   const systemPrompt = `Sen Replix AI — professional savdo qo'ng'iroqlarini tahlil qiluvchi sun'iy intellektsan.
-Seni Abdulloh yaratgan. Sen Qara Manda qurilish do'koni uchun ishlayman.
+Seni Abdulloh yaratgan. Sen Dunyabunya savdo platformasi uchun ishlayman.
 
 Vazifang: Manager va mijoz o'rtasidagi suhbatni tahlil qilib, quyidagi formatda JSON qaytarish:
 - Suhbat qisqacha tahlili (o'zbekcha)
