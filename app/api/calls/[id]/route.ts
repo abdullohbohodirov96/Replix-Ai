@@ -38,7 +38,8 @@ export async function PATCH(
     const filePath = path.join(uploadsDir, fileName)
 
     const arrayBuffer = await audioFile.arrayBuffer()
-    await writeFile(filePath, Buffer.from(arrayBuffer))
+    const audioBuffer = Buffer.from(arrayBuffer)
+    await writeFile(filePath, audioBuffer)
 
     // Delete old audio file
     if (existingCall.audioPath && existsSync(existingCall.audioPath)) {
@@ -60,18 +61,38 @@ export async function PATCH(
       data: {
         audioFileName: audioFile.name,
         audioPath: filePath,
+        audioData: audioBuffer,
+        audioMimeType: audioFile.type || 'audio/mpeg',
         transcription,
         analysis: analysis.analysis,
         rating: analysis.rating,
         problems: JSON.stringify(analysis.problems),
         positives: JSON.stringify(analysis.positives),
+        recommendations: JSON.stringify(analysis.recommendations),
+        improvement: analysis.improvement,
         clientSentiment: analysis.clientSentiment,
         callOutcome: analysis.callOutcome,
         summary: analysis.summary,
       },
     })
 
-    return NextResponse.json(updatedCall)
+    return NextResponse.json({
+      id: updatedCall.id,
+      managerId: updatedCall.managerId,
+      managerName: existingCall.manager.name,
+      audioFileName: updatedCall.audioFileName,
+      transcription: updatedCall.transcription,
+      analysis: updatedCall.analysis,
+      rating: updatedCall.rating,
+      problems: analysis.problems,
+      positives: analysis.positives,
+      recommendations: analysis.recommendations,
+      improvement: updatedCall.improvement,
+      clientSentiment: updatedCall.clientSentiment,
+      callOutcome: updatedCall.callOutcome,
+      summary: updatedCall.summary,
+      createdAt: updatedCall.createdAt,
+    })
   } catch (error) {
     console.error('PATCH call error:', error)
     return NextResponse.json({ error: 'Qayta yuklashda xatolik' }, { status: 500 })

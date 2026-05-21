@@ -28,12 +28,16 @@ model Call {
   manager         Manager   @relation(fields: [managerId], references: [id], onDelete: Cascade)
   audioFileName   String
   audioPath       String
+  audioData       Bytes?
+  audioMimeType   String?
   duration        Int?
   transcription   String?
   analysis        String?
   rating          Float?
   problems        String?
   positives       String?
+  recommendations String?
+  improvement     String?
   clientSentiment String?
   callOutcome     String?
   summary         String?

@@ -15,6 +15,12 @@ async function getManager(id: string) {
     include: {
       calls: {
         orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, audioFileName: true, transcription: true, analysis: true,
+          rating: true, problems: true, positives: true, recommendations: true,
+          improvement: true, clientSentiment: true, callOutcome: true,
+          summary: true, createdAt: true,
+        },
       },
       reports: {
         orderBy: { date: 'desc' },
@@ -171,8 +177,10 @@ export default async function ManagerDetailPage({
               {calls.map((call) => {
                 let problems: string[] = []
                 let positives: string[] = []
+                let recommendations: { problem: string; betterApproach: string }[] = []
                 try { problems = JSON.parse(call.problems || '[]') as string[] } catch {}
                 try { positives = JSON.parse(call.positives || '[]') as string[] } catch {}
+                try { recommendations = JSON.parse(call.recommendations || '[]') as { problem: string; betterApproach: string }[] } catch {}
 
                 return (
                   <div key={call.id} className="bg-[#0D0D1A] border border-[#1E1E35] rounded-xl overflow-hidden">
@@ -208,6 +216,16 @@ export default async function ManagerDetailPage({
                             <p className="mt-2 text-sm font-mono text-[#9494B8]">{call.summary}</p>
                           )}
                         </div>
+                      </div>
+
+                      {/* Audio player */}
+                      <div className="bg-[#111122] border border-[#1E1E35] rounded-lg p-3">
+                        <div className="text-xs font-mono text-[#FF6B35] mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                          <span>🎧</span> Audio yozuv
+                        </div>
+                        <audio controls preload="none" className="w-full h-9" src={`/api/calls/${call.id}/audio`}>
+                          Brauzeringiz audioni qo&apos;llab-quvvatlamaydi
+                        </audio>
                       </div>
 
                       {/* Analysis */}
@@ -253,6 +271,39 @@ export default async function ManagerDetailPage({
                           </div>
                         )}
                       </div>
+
+                      {/* Recommendations — what the manager should have done */}
+                      {recommendations.length > 0 && (
+                        <div className="bg-[#FF6B35]/5 border border-[#FF6B35]/20 rounded-lg p-4">
+                          <div className="text-xs font-mono text-[#FF6B35] mb-3 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>💡</span> Tavsiyalar — qanday qilish kerak edi
+                          </div>
+                          <div className="space-y-3">
+                            {recommendations.map((rec, i) => (
+                              <div key={i} className="bg-[#0D0D1A] border border-[#1E1E35] rounded-lg p-3">
+                                <div className="flex items-start gap-2 mb-2">
+                                  <span className="text-red-400 text-xs mt-0.5">✗</span>
+                                  <p className="text-xs font-mono text-[#E8E8F5] flex-1">{rec.problem}</p>
+                                </div>
+                                <div className="flex items-start gap-2 pl-0.5 border-l-2 border-green-500/30 ml-1.5 pl-3">
+                                  <span className="text-green-400 text-xs mt-0.5">✓</span>
+                                  <p className="text-xs font-mono text-[#9494B8] flex-1 leading-relaxed">{rec.betterApproach}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Improvement summary */}
+                      {call.improvement && (
+                        <div className="bg-[#111122] border border-[#1E1E35] rounded-lg p-3">
+                          <div className="text-xs font-mono text-yellow-400 mb-1.5 uppercase tracking-wider flex items-center gap-1">
+                            <span>📌</span> Yakuniy maslahat
+                          </div>
+                          <p className="text-xs font-mono text-[#9494B8] leading-relaxed">{call.improvement}</p>
+                        </div>
+                      )}
 
                       {/* Transcription (collapsible) */}
                       {call.transcription && (

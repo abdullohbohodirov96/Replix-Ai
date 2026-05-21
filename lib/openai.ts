@@ -5,8 +5,8 @@ const useGroq = !!process.env.GROQ_API_KEY
 
 export const openai = new OpenAI(
   useGroq
-    ? { apiKey: process.env.GROQ_API_KEY!, baseURL: 'https://api.groq.com/openai/v1' }
-    : { apiKey: process.env.OPENAI_API_KEY! }
+    ? { apiKey: process.env.GROQ_API_KEY || 'missing-key', baseURL: 'https://api.groq.com/openai/v1' }
+    : { apiKey: process.env.OPENAI_API_KEY || 'missing-key' }
 )
 
 export const CHAT_MODEL = useGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o'
@@ -22,11 +22,17 @@ export async function transcribeAudio(filePath: string): Promise<string> {
   return transcription as unknown as string
 }
 
+export interface Recommendation {
+  problem: string         // nima xato bo'ldi
+  betterApproach: string  // manager nima deyishi/qilishi kerak edi (aniq misol bilan)
+}
+
 export interface CallAnalysisResult {
   summary: string
   rating: number
   problems: string[]
   positives: string[]
+  recommendations: Recommendation[]
   clientSentiment: 'positive' | 'negative' | 'neutral'
   callOutcome: 'sale' | 'followup' | 'rejected' | 'unknown'
   analysis: string
@@ -37,54 +43,90 @@ export async function analyzeCallTranscription(
   transcription: string,
   managerName: string
 ): Promise<CallAnalysisResult> {
-  const systemPrompt = `Sen Replix AI — professional savdo qo'ng'iroqlarini tahlil qiluvchi sun'iy intellektsan.
-Sen Dunyabunya savdo platformasi uchun ishlayman. Abdulloh tomonidan yaratilgan.
+  const systemPrompt = `Sen Replix AI — professional savdo trenerisan. Dunyabunya savdo platformasi uchun ishlaysan.
+Sening vazifang — savdo qo'ng'iroqlarini chuqur tahlil qilib, managerga ANIQ va AMALIY maslahatlar berish.
 
-Vazifang: Manager va mijoz o'rtasidagi suhbatni tahlil qilib, quyidagi formatda JSON qaytarish:
-- summary: Suhbat qisqacha tahlili (o'zbekcha)
-- rating: 5 yulduzdan baho (1.0 - 5.0, float)
-- problems: Muammolar ro'yxati (o'zbekcha string array)
-- positives: Ijobiy tomonlar ro'yxati (o'zbekcha string array)
-- clientSentiment: "positive" | "negative" | "neutral"
-- callOutcome: "sale" | "followup" | "rejected" | "unknown"
-- analysis: Batafsil tahlil (o'zbekcha)
-- improvement: Yaxshilash bo'yicha tavsiyalar (o'zbekcha)
+MUHIM QOIDALAR:
+1. Hech qachon umumiy gap aytma. "Manager professional harakat qilmagan" deyish — YOMON javob.
+   Buning o'rniga aniq ayt: NIMANI noto'g'ri qildi, va o'rniga ANIQ NIMA deyishi kerak edi.
+2. Har bir muammo uchun managerga aniq jumla / skript ber. Misol uchun:
+   "Manager narxni darrov aytib yubordi. To'g'risi: avval qiymatni tushuntirib, keyin
+   'Bu xizmat oyiga shuncha turadi, lekin u sizga quyidagilarni beradi...' deyish kerak edi."
+3. ChatGPT kabi tushunarli, samimiy va foydali bo'l. Manager o'qib, darrov nima qilishni bilsin.
+
+Quyidagi formatda JSON qaytaras:
+{
+  "summary": "Suhbat qisqacha mazmuni (2-3 jumla, o'zbekcha)",
+  "rating": 1.0-5.0 oralig'ida float baho,
+  "problems": ["aniq muammo 1", "aniq muammo 2", ...] (o'zbekcha, aniq),
+  "positives": ["manager yaxshi qilgan narsa 1", ...] (o'zbekcha),
+  "recommendations": [
+    {
+      "problem": "Aniq nima xato bo'ldi",
+      "betterApproach": "Manager o'rniga ANIQ nima deyishi kerak edi — to'liq jumla yoki skript bilan. Nega bu yaxshiroq ekanligini ham tushuntir."
+    }
+  ] (kamida 2-4 ta, eng muhim muammolar uchun),
+  "clientSentiment": "positive" | "negative" | "neutral",
+  "callOutcome": "sale" | "followup" | "rejected" | "unknown",
+  "analysis": "Batafsil tahlil — suhbat qanday ketdi, manager va mijoz qanday gaplashdi, qayerda yutdi/yutqazdi (o'zbekcha, 4-6 jumla)",
+  "improvement": "Umumiy yakuniy maslahat — keyingi qo'ng'iroqlarda manager nimaga e'tibor berishi kerak (o'zbekcha, 2-3 jumla)"
+}
 
 Baholash mezonlari:
-1 - Juda yomon: manager qo'pol, savol bermaydi
-2 - Yomon: asosiy xatolar, tinghlamaydi
-3 - O'rtacha: ba'zi xatolar bor
-4 - Yaxshi: professional, kichik kamchiliklar
-5 - A'lo: mijozni tingladi, professional javob berdi
+1 - Juda yomon: qo'pol, savol bermaydi, mahsulotni bilmaydi
+2 - Yomon: jiddiy xatolar, mijozni tinglamaydi, ehtiyojni aniqlamaydi
+3 - O'rtacha: asosiy ma'lumot berildi lekin sotuv texnikasi zaif
+4 - Yaxshi: professional, ehtiyojni aniqladi, kichik kamchiliklar
+5 - A'lo: mijozni tingladi, ehtiyojni aniqladi, e'tirozlar bilan ishladi, natijaga olib keldi
 
-Faqat JSON qaytarasan.`
+Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.`
 
   const response = await openai.chat.completions.create({
     model: CHAT_MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: `Manager: ${managerName}\n\nTranskripsiya:\n${transcription}\n\nJSON formatida tahlil ber:` },
+      { role: 'user', content: `Manager ismi: ${managerName}\n\nQo'ng'iroq transkripsiyasi:\n${transcription}\n\nYuqoridagi JSON formatida chuqur tahlil ber. Recommendations da har bir muammo uchun manager ANIQ nima deyishi kerakligini yoz.` },
     ],
     response_format: { type: 'json_object' },
-    temperature: 0.3,
-    max_tokens: 1024,
+    temperature: 0.4,
+    max_tokens: 2048,
   })
 
   const content = response.choices[0].message.content || '{}'
   try {
     const r = JSON.parse(content)
+    const recs: Recommendation[] = Array.isArray(r.recommendations)
+      ? r.recommendations
+          .filter((x: unknown) => x && typeof x === 'object')
+          .map((x: { problem?: string; betterApproach?: string }) => ({
+            problem: String(x.problem || ''),
+            betterApproach: String(x.betterApproach || ''),
+          }))
+          .filter((x: Recommendation) => x.problem && x.betterApproach)
+      : []
     return {
       summary: r.summary || 'Tahlil mavjud emas',
       rating: Math.min(5, Math.max(1, parseFloat(String(r.rating || '3')))),
-      problems: Array.isArray(r.problems) ? r.problems : [],
-      positives: Array.isArray(r.positives) ? r.positives : [],
+      problems: Array.isArray(r.problems) ? r.problems.map(String) : [],
+      positives: Array.isArray(r.positives) ? r.positives.map(String) : [],
+      recommendations: recs,
       clientSentiment: r.clientSentiment || 'neutral',
       callOutcome: r.callOutcome || 'unknown',
       analysis: r.analysis || '',
       improvement: r.improvement || '',
     }
   } catch {
-    return { summary: 'Tahlil xatolik', rating: 3, problems: [], positives: [], clientSentiment: 'neutral', callOutcome: 'unknown', analysis: content, improvement: '' }
+    return {
+      summary: 'Tahlil xatolik',
+      rating: 3,
+      problems: [],
+      positives: [],
+      recommendations: [],
+      clientSentiment: 'neutral',
+      callOutcome: 'unknown',
+      analysis: content,
+      improvement: '',
+    }
   }
 }
 
@@ -98,11 +140,11 @@ export async function generateDailyReport(
     model: CHAT_MODEL,
     messages: [{
       role: 'user',
-      content: `${managerName} managerning bugungi qo'ng'iroqlari:\n${calls.map((c, i) => `${i+1}. Baho: ${c.rating}/5 | ${c.callOutcome} | ${c.summary}`).join('\n')}\n\nJSON: { "summary": "...", "topProblems": [...], "improvement": "..." }`,
+      content: `Sen savdo trenerisan. ${managerName} managerning bugungi qo'ng'iroqlari:\n${calls.map((c, i) => `${i+1}. Baho: ${c.rating}/5 | ${c.callOutcome} | ${c.summary}`).join('\n')}\n\nManagerga aniq, amaliy maslahat ber. JSON: { "summary": "kunlik umumiy xulosa", "topProblems": ["eng muhim muammo 1", "muammo 2"], "improvement": "ertaga nimaga e'tibor berish kerak — aniq maslahat" }`,
     }],
     response_format: { type: 'json_object' },
-    temperature: 0.3,
-    max_tokens: 512,
+    temperature: 0.4,
+    max_tokens: 700,
   })
 
   try {

@@ -12,7 +12,10 @@ async function getDashboardStats() {
     prisma.call.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
-      include: { manager: true },
+      select: {
+        id: true, callOutcome: true, rating: true, summary: true, createdAt: true,
+        manager: { select: { id: true, name: true } },
+      },
     }),
     prisma.manager.findMany({
       include: {

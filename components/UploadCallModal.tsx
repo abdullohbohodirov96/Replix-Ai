@@ -9,6 +9,11 @@ interface Manager {
   position?: string | null
 }
 
+interface Recommendation {
+  problem: string
+  betterApproach: string
+}
+
 interface CallResult {
   id: string
   managerId: string
@@ -19,6 +24,8 @@ interface CallResult {
   rating: number | null
   problems: string[]
   positives: string[]
+  recommendations: Recommendation[]
+  improvement: string | null
   clientSentiment: string | null
   callOutcome: string | null
   summary: string | null
@@ -283,7 +290,15 @@ export default function UploadCallModal({ managerId, managerName, managers, exis
 
               {/* Results */}
               {status === 'done' && result && (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {/* Audio player */}
+                  <div className="bg-[#111122] border border-[#1E1E35] rounded-lg p-3">
+                    <div className="text-[10px] font-mono text-[#FF6B35] uppercase tracking-widest mb-2">🎧 Audio yozuv</div>
+                    <audio controls preload="none" className="w-full h-9" src={`/api/calls/${result.id}/audio`}>
+                      Brauzer audioni qo&apos;llab-quvvatlamaydi
+                    </audio>
+                  </div>
+
                   {/* Rating */}
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono text-[#9494B8]">Baho:</span>
@@ -303,6 +318,27 @@ export default function UploadCallModal({ managerId, managerName, managers, exis
                     </div>
                   )}
 
+                  {/* Recommendations */}
+                  {result.recommendations && result.recommendations.length > 0 && (
+                    <div className="bg-[#FF6B35]/5 border border-[#FF6B35]/20 rounded-lg p-3">
+                      <div className="text-[10px] font-mono text-[#FF6B35] uppercase tracking-widest mb-2">💡 Tavsiyalar</div>
+                      <div className="space-y-2">
+                        {result.recommendations.map((rec, i) => (
+                          <div key={i} className="bg-[#0D0D1A] border border-[#1E1E35] rounded-lg p-2.5">
+                            <div className="flex items-start gap-1.5 mb-1.5">
+                              <span className="text-red-400 text-xs">✗</span>
+                              <p className="text-xs font-mono text-[#E8E8F5] flex-1">{rec.problem}</p>
+                            </div>
+                            <div className="flex items-start gap-1.5 border-l-2 border-green-500/30 pl-2 ml-1">
+                              <span className="text-green-400 text-xs">✓</span>
+                              <p className="text-xs font-mono text-[#9494B8] flex-1 leading-relaxed">{rec.betterApproach}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Problems */}
                   {result.problems.length > 0 && (
                     <div>
@@ -312,6 +348,14 @@ export default function UploadCallModal({ managerId, managerName, managers, exis
                           <span className="text-red-400">⚠</span>{p}
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Improvement */}
+                  {result.improvement && (
+                    <div className="bg-[#111122] border border-[#1E1E35] rounded-lg p-3">
+                      <div className="text-[10px] font-mono text-yellow-400 uppercase tracking-widest mb-1">📌 Yakuniy maslahat</div>
+                      <p className="text-xs font-mono text-[#9494B8] leading-relaxed">{result.improvement}</p>
                     </div>
                   )}
                 </div>

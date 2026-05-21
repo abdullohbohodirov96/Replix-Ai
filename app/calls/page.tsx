@@ -12,7 +12,11 @@ export const revalidate = 0
 async function getCalls(managerId?: string | null) {
   return prisma.call.findMany({
     where: managerId ? { managerId } : undefined,
-    include: { manager: true },
+    select: {
+      id: true, managerId: true, audioFileName: true, rating: true,
+      callOutcome: true, clientSentiment: true, summary: true, createdAt: true,
+      manager: { select: { id: true, name: true } },
+    },
     orderBy: { createdAt: 'desc' },
   })
 }
