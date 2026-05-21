@@ -11,7 +11,6 @@ export async function transcribeAudio(audioFilePath: string): Promise<string> {
   const transcription = await openai.audio.transcriptions.create({
     file: audioFile,
     model: 'whisper-1',
-    language: 'uz', // Uzbek language
     response_format: 'text',
   })
 
