@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Sidebar from '@/components/Sidebar'
+import ChatBot from '@/components/ChatBot'
 
 export const metadata: Metadata = {
   title: 'Dunyabunya — Replix AI Analytics',
@@ -33,6 +34,7 @@ export default function RootLayout({
               {children}
             </div>
           </main>
+          <ChatBot />
         </div>
       </body>
     </html>

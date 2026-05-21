@@ -51,6 +51,16 @@ model DailyReport {
   summary       String?
   improvement   String?
   createdAt     DateTime @default(now())
-  
+
   @@unique([managerId, date])
+}
+
+model SupportMessage {
+  id         String   @id @default(cuid())
+  sessionId  String
+  userMsg    String
+  aiMsg      String
+  adminReply String?
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
 }

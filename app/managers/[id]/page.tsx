@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import UploadCallModal from '@/components/UploadCallModal'
 import DeleteCallButton from '@/components/DeleteCallButton'
+import ReuploadCallButton from '@/components/ReuploadCallButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -189,6 +190,11 @@ export default async function ManagerDetailPage({
                       <div className="flex items-center gap-2">
                         <SentimentBadge sentiment={call.clientSentiment} />
                         <OutcomeBadge outcome={call.callOutcome} />
+                        <ReuploadCallButton
+                          callId={call.id}
+                          managerId={manager.id}
+                          managerName={manager.name}
+                        />
                         <DeleteCallButton callId={call.id} />
                       </div>
                     </div>
