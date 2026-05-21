@@ -1,5 +1,41 @@
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { NextAuthOptions } from 'next-auth'
+import CredentialsProvider from 'next-auth/providers/credentials'
+import bcrypt from 'bcryptjs'
+import { prisma } from '@/lib/prisma'
+
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email:    { label: 'Email',    type: 'email' },
+        password: { label: 'Parol',   type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null
+        const user = await prisma.user.findUnique({ where: { email: credentials.email } })
+        if (!user) return null
+        const valid = await bcrypt.compare(credentials.password, user.password)
+        if (!valid) return null
+        return { id: user.id, name: user.name, email: user.email, role: user.role }
+      },
+    }),
+  ],
+  callbacks: {
+    jwt({ token, user }) {
+      if (user) token.role = (user as { role: string }).role
+      return token
+    },
+    session({ session, token }) {
+      if (session.user) (session.user as { role?: string }).role = token.role as string
+      return session
+    },
+  },
+  pages: { signIn: '/login' },
+  session: { strategy: 'jwt' },
+  secret: process.env.NEXTAUTH_SECRET,
+}
 
 export async function getSession() {
   return getServerSession(authOptions)
@@ -7,7 +43,7 @@ export async function getSession() {
 
 export async function requireAdmin() {
   const session = await getSession()
-  if (!session || session.user?.role !== 'admin') {
+  if (!session || (session.user as { role?: string })?.role !== 'admin') {
     return null
   }
   return session
