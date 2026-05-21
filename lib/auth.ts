@@ -24,7 +24,7 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     jwt({ token, user }) {
-      if (user) token.role = (user as { role: string }).role
+      if (user) token.role = (user as unknown as { role: string }).role
       return token
     },
     session({ session, token }) {
