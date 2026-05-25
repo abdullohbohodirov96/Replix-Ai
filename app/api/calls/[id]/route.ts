@@ -3,9 +3,33 @@ import { prisma } from '@/lib/prisma'
 import { unlink, writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import { transcribeAudio, analyzeCallTranscription } from '@/lib/openai'
 
 export const dynamic = 'force-dynamic'
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const call = await prisma.call.findUnique({
+      where: { id: params.id },
+      include: { manager: { select: { id: true, name: true, position: true } } },
+    })
+    if (!call) return NextResponse.json({ error: 'Topilmadi' }, { status: 404 })
+    return NextResponse.json({
+      ...call,
+      problems: call.problems ? JSON.parse(call.problems) : [],
+      positives: call.positives ? JSON.parse(call.positives) : [],
+      recommendations: call.recommendations ? JSON.parse(call.recommendations) : [],
+      audioData: undefined,
+    })
+  } catch (error) {
+    console.error('GET call error:', error)
+    return NextResponse.json({ error: 'Server xatoligi' }, { status: 500 })
+  }
+}
+
+import { transcribeAudio, analyzeCallTranscription } from '@/lib/openai'
 
 export async function PATCH(
   request: NextRequest,

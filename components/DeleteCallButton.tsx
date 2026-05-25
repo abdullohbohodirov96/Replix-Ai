@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function DeleteCallButton({ callId }: { callId: string }) {
+export default function DeleteCallButton({ callId, redirectTo }: { callId: string; redirectTo?: string }) {
   const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -13,7 +13,8 @@ export default function DeleteCallButton({ callId }: { callId: string }) {
     try {
       const res = await fetch(`/api/calls/${callId}`, { method: 'DELETE' })
       if (res.ok) {
-        router.refresh()
+        if (redirectTo) router.push(redirectTo)
+        else router.refresh()
       }
     } finally {
       setLoading(false)
