@@ -41,7 +41,8 @@ export interface CallAnalysisResult {
 
 export async function analyzeCallTranscription(
   transcription: string,
-  managerName: string
+  managerName: string,
+  extraContext?: string
 ): Promise<CallAnalysisResult> {
   const systemPrompt = `Sen Replix AI — professional savdo trenerisan. Dunyabunya savdo platformasi uchun ishlaysan.
 Sening vazifang — savdo qo'ng'iroqlarini chuqur tahlil qilib, managerga ANIQ va AMALIY maslahatlar berish.
@@ -79,7 +80,7 @@ Baholash mezonlari:
 4 - Yaxshi: professional, ehtiyojni aniqladi, kichik kamchiliklar
 5 - A'lo: mijozni tingladi, ehtiyojni aniqladi, e'tirozlar bilan ishladi, natijaga olib keldi
 
-Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.`
+Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.${extraContext || ''}`
 
   const response = await openai.chat.completions.create({
     model: CHAT_MODEL,

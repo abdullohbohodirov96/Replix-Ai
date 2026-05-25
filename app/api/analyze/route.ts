@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { transcribeAudio, analyzeCallTranscription } from '@/lib/openai'
+import { getRelevantKnowledge, extractKnowledgeFromCall } from '@/lib/ai-learning'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 import { existsSync } from 'fs'
@@ -16,6 +17,52 @@ async function ensureUploadsDir() {
     await mkdir(uploadsDir, { recursive: true })
   }
   return uploadsDir
+}
+
+async function fireAndForgetIntegrations(call: {
+  id: string; audioFileName: string; rating: number | null
+  summary: string | null; analysis: string | null; callOutcome: string | null
+  problems: string | null; positives: string | null; clientSentiment: string | null
+  createdAt: Date
+}, managerName: string) {
+  try {
+    const integrations = await prisma.integration.findMany({
+      where: { enabled: true },
+    })
+    const names = integrations.map(i => i.name)
+
+    if (names.includes('telegram')) {
+      const { sendCallAnalysis } = await import('@/lib/integrations/telegram')
+      sendCallAnalysis(call, managerName).catch(e => console.error('Telegram sync error:', e))
+
+      // Send alert for low-rated calls
+      if (call.rating !== null && call.rating < 3.0) {
+        const { sendAlert } = await import('@/lib/integrations/telegram')
+        sendAlert('low_rating', {
+          rating: call.rating,
+          managerName,
+          audioFileName: call.audioFileName,
+        }).catch(e => console.error('Telegram alert error:', e))
+      }
+    }
+
+    if (names.includes('amocrm')) {
+      const { syncCallToAmo } = await import('@/lib/integrations/amocrm')
+      syncCallToAmo(call, managerName).catch(e => console.error('AmoCRM sync error:', e))
+    }
+
+    if (names.includes('bitrix24')) {
+      const { syncCallToBitrix } = await import('@/lib/integrations/bitrix24')
+      syncCallToBitrix(call, managerName).catch(e => console.error('Bitrix24 sync error:', e))
+    }
+
+    if (names.includes('google_sheets')) {
+      const { exportCallToSheets } = await import('@/lib/integrations/google-sheets')
+      exportCallToSheets(call, managerName).catch(e => console.error('Sheets sync error:', e))
+    }
+  } catch (err) {
+    console.error('fireAndForgetIntegrations error:', err)
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -38,7 +85,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Manager tanlanmagan' }, { status: 400 })
     }
 
-    // Regular users can only upload for their own assigned manager
     if (!isAdmin && managerId !== sessionUser.managerId) {
       return NextResponse.json(
         { error: 'Siz faqat o\'zingizga biriktirilgan manager uchun audio yuklay olasiz' },
@@ -74,10 +120,19 @@ export async function POST(request: NextRequest) {
       console.error('Transcription error:', err)
     }
 
+    let learnedContext = ''
+    try {
+      learnedContext = await getRelevantKnowledge(8)
+    } catch { /* non-critical */ }
+
     let analysisResult = null
     if (transcription) {
       try {
-        analysisResult = await analyzeCallTranscription(transcription, manager.name)
+        analysisResult = await analyzeCallTranscription(
+          transcription,
+          manager.name,
+          learnedContext || undefined
+        )
       } catch (err) {
         console.error('Analysis error:', err)
       }
@@ -103,6 +158,25 @@ export async function POST(request: NextRequest) {
       },
       include: { manager: true },
     })
+
+    // Fire-and-forget: extract AI knowledge and sync integrations
+    if (transcription && analysisResult?.analysis) {
+      extractKnowledgeFromCall(call.id, transcription, analysisResult.analysis)
+        .catch(e => console.error('AI knowledge extraction error:', e))
+    }
+
+    fireAndForgetIntegrations({
+      id: call.id,
+      audioFileName: call.audioFileName,
+      rating: call.rating,
+      summary: call.summary,
+      analysis: call.analysis,
+      callOutcome: call.callOutcome,
+      problems: call.problems,
+      positives: call.positives,
+      clientSentiment: call.clientSentiment,
+      createdAt: call.createdAt,
+    }, call.manager.name)
 
     return NextResponse.json({
       success: true,
