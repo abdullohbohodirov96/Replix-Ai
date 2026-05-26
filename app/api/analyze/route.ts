@@ -125,18 +125,60 @@ export async function POST(request: NextRequest) {
       learnedContext = await getRelevantKnowledge(8)
     } catch { /* non-critical */ }
 
+    // Fetch company context + categories for enriched analysis
+    const [company, callCategories] = await Promise.all([
+      prisma.company.findFirst().catch(() => null),
+      prisma.callCategory.findMany({ include: { criteria: { orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } }).catch(() => []),
+    ])
+
+    let extraContext = learnedContext || ''
+    if (company?.aiContext) {
+      extraContext = `\n\nKompaniya konteksti:\n${company.aiContext}${extraContext ? '\n\n' + extraContext : ''}`
+    }
+    if (callCategories.length > 0) {
+      const catList = callCategories.map(c => `- ${c.name}${c.description ? ': ' + c.description : ''}`).join('\n')
+      extraContext += `\n\nMavjud suhbat kategoriyalari (callOutcome emas, suhbat turi):\n${catList}\n\nJSON javobida "callCategory" maydonini ham qo'sh — qaysi kategoriya ekanligini aniqlash uchun kategoriya nomini yoz (mavjud bo'lmasa null).`
+    }
+
     let analysisResult = null
     if (transcription) {
       try {
         analysisResult = await analyzeCallTranscription(
           transcription,
           manager.name,
-          learnedContext || undefined
+          extraContext || undefined
         )
       } catch (err) {
         console.error('Analysis error:', err)
       }
     }
+
+    // Determine category from AI response
+    let categoryId: string | null = null
+    if (analysisResult && callCategories.length > 0) {
+      try {
+        const raw = JSON.parse(analysisResult.analysis || '{}')
+        const catName = raw.callCategory as string | undefined
+        if (catName) {
+          const matched = callCategories.find(c =>
+            c.name.toLowerCase() === catName.toLowerCase() ||
+            catName.toLowerCase().includes(c.name.toLowerCase())
+          )
+          if (matched) categoryId = matched.id
+        }
+      } catch { /* ignore */ }
+      // Fallback: keyword match on summary
+      if (!categoryId && analysisResult.summary) {
+        for (const cat of callCategories) {
+          if (analysisResult.summary.toLowerCase().includes(cat.name.toLowerCase())) {
+            categoryId = cat.id
+            break
+          }
+        }
+      }
+    }
+
+    const score = analysisResult?.rating ? Math.round(analysisResult.rating * 20) : null
 
     const call = await prisma.call.create({
       data: {
@@ -148,6 +190,7 @@ export async function POST(request: NextRequest) {
         transcription: transcription || null,
         analysis: analysisResult?.analysis || null,
         rating: analysisResult?.rating || null,
+        score,
         problems: analysisResult ? JSON.stringify(analysisResult.problems) : null,
         positives: analysisResult ? JSON.stringify(analysisResult.positives) : null,
         recommendations: analysisResult ? JSON.stringify(analysisResult.recommendations) : null,
@@ -155,6 +198,9 @@ export async function POST(request: NextRequest) {
         clientSentiment: analysisResult?.clientSentiment || null,
         callOutcome: analysisResult?.callOutcome || null,
         summary: analysisResult?.summary || null,
+        categoryId,
+        status: 'analyzed',
+        analyzedAt: new Date(),
       },
       include: { manager: true },
     })

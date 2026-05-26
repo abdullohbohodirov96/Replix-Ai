@@ -3,36 +3,50 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Manager {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   name        String
   phone       String?
   email       String?
   avatar      String?
-  position    String?  @default("Sales Manager")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  position    String?       @default("Sales Manager")
+  projectId   String?
+  project     Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   calls       Call[]
   reports     DailyReport[]
   users       User[]
 }
 
+model Project {
+  id         String    @id @default(cuid())
+  name       String
+  adminEmail String?
+  adminPass  String?
+  managers   Manager[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
 model Call {
-  id              String    @id @default(cuid())
+  id              String        @id @default(cuid())
   managerId       String
-  manager         Manager   @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  manager         Manager       @relation(fields: [managerId], references: [id], onDelete: Cascade)
   audioFileName   String
   audioPath       String
   audioData       Bytes?
   audioMimeType   String?
   duration        Int?
+  clientPhone     String?
   transcription   String?
   analysis        String?
   rating          Float?
+  score           Float?
   problems        String?
   positives       String?
   recommendations String?
@@ -40,8 +54,72 @@ model Call {
   clientSentiment String?
   callOutcome     String?
   summary         String?
-  createdAt       DateTime  @default(now())
-  callDate        DateTime  @default(now())
+  leadQuality     String?
+  status          String        @default("analyzed")
+  categoryId      String?
+  category        CallCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  archivedAt      DateTime?
+  analyzedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  callDate        DateTime      @default(now())
+}
+
+model CallCategory {
+  id          String                 @id @default(cuid())
+  name        String                 @unique
+  description String?
+  color       String                 @default("#3b82f6")
+  order       Int                    @default(0)
+  isDefault   Boolean                @default(false)
+  calls       Call[]
+  criteria    ConversationCriteria[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+}
+
+model ConversationCriteria {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  categoryId  String
+  category    CallCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  weight      Float        @default(1.0)
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model LeadCategory {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  label       String
+  description String?
+  color       String         @default("#f97316")
+  order       Int            @default(0)
+  criteria    LeadCriteria[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model LeadCriteria {
+  id             String       @id @default(cuid())
+  name           String
+  description    String?
+  leadCategoryId String
+  leadCategory   LeadCategory @relation(fields: [leadCategoryId], references: [id], onDelete: Cascade)
+  order          Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  industry    String?
+  aiContext   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model DailyReport {
@@ -87,9 +165,9 @@ model SupportMessage {
 
 model Integration {
   id        String    @id @default(cuid())
-  name      String    @unique  // "telegram", "amocrm", "bitrix24", "google_sheets", "instagram"
+  name      String    @unique
   enabled   Boolean   @default(false)
-  config    Json?     // stores tokens, URLs, etc.
+  config    Json?
   lastSync  DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

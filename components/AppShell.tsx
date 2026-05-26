@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import ChatBot from './ChatBot'
+import AIAssistant from './AIAssistant'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -21,6 +22,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </main>
       <ChatBot />
+      <AIAssistant />
     </div>
   )
 }

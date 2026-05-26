@@ -284,3 +284,218 @@ body {
   background: #f97316;
   border-radius: 0 2px 2px 0;
 }
+
+/* ============ THEME: Light mode overrides ============ */
+[data-theme="light"] {
+  background: #f4f5f7;
+  color: #1a1b26;
+}
+[data-theme="light"] body {
+  background: #f4f5f7;
+  color: #1a1b26;
+}
+[data-theme="light"] .card {
+  background: #ffffff;
+  border-color: #e2e4e9;
+}
+[data-theme="light"] .stat-card {
+  background: #ffffff;
+  border-color: #e2e4e9;
+}
+[data-theme="light"] aside {
+  background: #ffffff !important;
+  border-color: #e2e4e9 !important;
+}
+[data-theme="light"] .data-table thead tr {
+  background: #f9fafb;
+}
+[data-theme="light"] .data-table thead th {
+  color: #374151;
+  border-color: #e5e7eb;
+}
+[data-theme="light"] .data-table tbody td {
+  border-color: #f3f4f6;
+  color: #374151;
+}
+[data-theme="light"] .data-table tbody tr:hover {
+  background: #f9fafb;
+}
+[data-theme="light"] nav a {
+  color: #4b5563 !important;
+}
+[data-theme="light"] nav a:hover {
+  color: #111827 !important;
+  background: #f3f4f6 !important;
+}
+
+/* ============ AI Assistant ============ */
+.ai-assistant-panel {
+  background: var(--bg-card, #141420);
+  border: 1px solid var(--bg-border, #1e1e30);
+  border-radius: 10px;
+  padding: 14px 16px;
+  width: 220px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+[data-theme="light"] .ai-assistant-panel {
+  background: #ffffff;
+  border-color: #e2e4e9;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+.ai-assistant-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f97316;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.ai-assistant-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.5);
+}
+
+/* ============ Score color classes ============ */
+.score-low { color: #ef4444; }
+.score-mid { color: #f59e0b; }
+.score-good { color: #84cc16; }
+.score-great { color: #f59e0b; }
+.score-gold { color: #f97316; }
+
+.score-bg-low { background: rgba(239,68,68,0.1); }
+.score-bg-mid { background: rgba(245,158,11,0.1); }
+.score-bg-good { background: rgba(132,204,18,0.1); }
+.score-bg-gold { background: rgba(249,115,22,0.1); }
+
+/* ============ Minimalist adjustments ============ */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #4a4a70;
+  margin-bottom: 12px;
+}
+[data-theme="light"] .section-title {
+  color: #9ca3af;
+}
+
+.metric-card {
+  background: #141420;
+  border: 1px solid #1e1e30;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+[data-theme="light"] .metric-card {
+  background: #ffffff;
+  border-color: #e2e4e9;
+}
+
+.metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: #4a4a70;
+  margin-top: 4px;
+}
+[data-theme="light"] .metric-label {
+  color: #9ca3af;
+}
+
+/* ============ Progress bars ============ */
+.bar-track {
+  height: 4px;
+  background: #1e1e30;
+  border-radius: 2px;
+  overflow: hidden;
+  flex: 1;
+}
+[data-theme="light"] .bar-track {
+  background: #e5e7eb;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+
+/* ============ Tabs ============ */
+.tab-list {
+  display: flex;
+  gap: 2px;
+  background: #141420;
+  border-radius: 8px;
+  padding: 3px;
+}
+[data-theme="light"] .tab-list {
+  background: #f3f4f6;
+}
+.tab-item {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #4a4a70;
+  border: none;
+  background: transparent;
+}
+.tab-item.active {
+  background: #0e0e16;
+  color: #e2e2ee;
+}
+[data-theme="light"] .tab-item {
+  color: #9ca3af;
+}
+[data-theme="light"] .tab-item.active {
+  background: #ffffff;
+  color: #1a1b26;
+}
+
+/* ============ Input fields minimal ============ */
+.input-field {
+  background: #0e0e16;
+  border: 1px solid #1e1e30;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: #e2e2ee;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+.input-field:focus {
+  border-color: #f97316;
+}
+[data-theme="light"] .input-field {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+  color: #1a1b26;
+}
+[data-theme="light"] .input-field:focus {
+  border-color: #f97316;
+}
+
+/* ============ Lead quality badges ============ */
+.lead-hot { color: #ef4444; background: rgba(239,68,68,0.1); }
+.lead-warm { color: #f59e0b; background: rgba(245,158,11,0.1); }
+.lead-cold { color: #3b82f6; background: rgba(59,130,246,0.1); }
+
+/* ============ Donut chart ============ */
+.donut-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.donut-center { position: absolute; text-align: center; }

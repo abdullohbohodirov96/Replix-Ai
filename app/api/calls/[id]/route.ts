@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { unlink, writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +38,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    const sessionUser = session?.user as { role?: string; managerId?: string | null } | undefined
+
     const existingCall = await prisma.call.findUnique({
       where: { id: params.id },
       include: { manager: true },
@@ -44,6 +49,27 @@ export async function PATCH(
       return NextResponse.json({ error: "Qo'ng'iroq topilmadi" }, { status: 404 })
     }
 
+    if (sessionUser?.role !== 'admin' && existingCall.managerId !== sessionUser?.managerId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Detect if this is a JSON update (archivedAt, status, etc.) or a FormData re-upload
+    const contentType = request.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      const body = await request.json()
+      const updated = await prisma.call.update({
+        where: { id: params.id },
+        data: {
+          archivedAt: body.archivedAt !== undefined ? (body.archivedAt ? new Date(body.archivedAt) : null) : undefined,
+          status: body.status,
+          categoryId: body.categoryId,
+          clientPhone: body.clientPhone,
+        },
+      })
+      return NextResponse.json(updated)
+    }
+
+    // FormData path: re-upload audio and re-analyze
     const formData = await request.formData()
     const audioFile = formData.get('audio') as File | null
     if (!audioFile) {

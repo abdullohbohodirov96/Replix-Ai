@@ -3,11 +3,33 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
+import { useTheme } from '@/contexts/ThemeContext'
+import { useLang } from '@/contexts/LanguageContext'
+
+const SunIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5" />
+    <line x1="12" y1="1" x2="12" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="23" />
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+    <line x1="1" y1="12" x2="3" y2="12" />
+    <line x1="21" y1="12" x2="23" y2="12" />
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+  </svg>
+)
+
+const MoonIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+)
 
 const navItems = [
   {
     href: '/dashboard',
-    label: 'Dashboard',
+    labelKey: 'dashboard' as const,
     adminOnly: false,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -20,7 +42,7 @@ const navItems = [
   },
   {
     href: '/managers',
-    label: 'Managerlar',
+    labelKey: 'managers' as const,
     adminOnly: false,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -33,7 +55,7 @@ const navItems = [
   },
   {
     href: '/calls',
-    label: "Qo'ng'iroqlar",
+    labelKey: 'calls' as const,
     adminOnly: false,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -43,7 +65,7 @@ const navItems = [
   },
   {
     href: '/reports',
-    label: 'Hisobotlar',
+    labelKey: 'reports' as const,
     adminOnly: false,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -55,7 +77,7 @@ const navItems = [
   },
   {
     href: '/analytics',
-    label: 'AI Tahlil',
+    labelKey: 'analytics' as const,
     adminOnly: false,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -66,7 +88,7 @@ const navItems = [
   },
   {
     href: '/integrations',
-    label: 'Integratsiyalar',
+    labelKey: 'integrations' as const,
     adminOnly: true,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -77,7 +99,7 @@ const navItems = [
   },
   {
     href: '/admin/users',
-    label: 'Foydalanuvchilar',
+    labelKey: 'users' as const,
     adminOnly: true,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -87,12 +109,24 @@ const navItems = [
     ),
   },
   {
-    href: '/admin',
-    label: 'Yordam',
+    href: '/settings',
+    labelKey: 'settings' as const,
     adminOnly: true,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/profile',
+    labelKey: 'profile' as const,
+    adminOnly: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
       </svg>
     ),
   },
@@ -132,6 +166,8 @@ export default function Sidebar() {
   const { data: session } = useSession()
   const role = (session?.user as { role?: string })?.role
   const isAdmin = role === 'admin'
+  const { theme, toggle: toggleTheme } = useTheme()
+  const { lang, t, setLang } = useLang()
 
   const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin)
 
@@ -188,10 +224,10 @@ export default function Sidebar() {
               <span className={`transition-colors flex-shrink-0 ${isActive ? 'text-brand-orange' : 'text-text-muted group-hover:text-text-secondary'}`}>
                 {item.icon}
               </span>
-              <span className="font-medium">{item.label}</span>
+              <span className="font-medium">{t(item.labelKey)}</span>
               {item.adminOnly && (
                 <span className="ml-auto text-2xs bg-bg-elevated text-text-muted px-1.5 py-0.5 rounded uppercase tracking-wider">
-                  Admin
+                  {t('admin')}
                 </span>
               )}
             </Link>
@@ -231,6 +267,33 @@ export default function Sidebar() {
               </div>
             </div>
           </div>
+
+          {/* Theme & Language toggles */}
+          <div className="flex items-center justify-between px-3 mb-1">
+            <button
+              onClick={toggleTheme}
+              className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
+            >
+              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+              <span>{theme === 'dark' ? "Yorug'" : "Qorong'u"}</span>
+            </button>
+            <div className="flex items-center gap-0.5">
+              {(['uz', 'ru', 'en'] as const).map(l => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={`text-2xs px-1.5 py-0.5 rounded uppercase font-medium transition-colors ${
+                    lang === l
+                      ? 'bg-brand-orange text-white'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs text-text-muted hover:text-status-danger hover:bg-status-danger/5 transition-colors"
@@ -240,7 +303,7 @@ export default function Sidebar() {
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
-            <span className="font-medium">Chiqish</span>
+            <span className="font-medium">{t('logout')}</span>
           </button>
         </div>
       ) : (
