@@ -28,28 +28,59 @@ async function getManagers(managerId?: string | null) {
   })
 }
 
-function StarDisplay({ rating }: { rating: number | null }) {
-  if (!rating) return <span className="text-[#333360] font-mono text-xs">—</span>
+function RatingDisplay({ rating }: { rating: number | null }) {
+  if (!rating) return <span className="font-data text-xs text-text-muted">—</span>
+  const colorClass =
+    rating >= 4.5 ? 'text-status-success' :
+    rating >= 3.5 ? 'text-status-warning' :
+    'text-status-danger'
   return (
-    <span className="flex items-center gap-0.5">
-      {[1,2,3,4,5].map(i => (
-        <span key={i} className={`text-sm ${i <= Math.round(rating) ? 'text-[#FF6B35]' : 'text-[#1E1E35]'}`}>★</span>
-      ))}
-      <span className="ml-1 text-xs font-mono text-[#9494B8]">{rating.toFixed(1)}</span>
+    <span className={`font-data text-sm font-medium ${colorClass}`}>
+      {rating.toFixed(1)}
     </span>
   )
 }
 
 function OutcomeBadge({ outcome }: { outcome: string | null }) {
   const map: Record<string, { label: string; cls: string }> = {
-    sale:      { label: '✓ Sotildi',     cls: 'badge-success' },
-    followup:  { label: '→ Davom',       cls: 'badge-info' },
-    rejected:  { label: '✗ Rad',         cls: 'badge-danger' },
-    unknown:   { label: '? Noma\'lum',   cls: 'badge-neutral' },
+    sale:     { label: 'Sotildi',    cls: 'badge-success' },
+    followup: { label: 'Davom',      cls: 'badge-info' },
+    rejected: { label: 'Rad etildi', cls: 'badge-danger' },
+    unknown:  { label: "Noma'lum",   cls: 'badge-neutral' },
   }
   const o = map[outcome || 'unknown'] || map['unknown']
   return <span className={`badge ${o.cls}`}>{o.label}</span>
 }
+
+function SentimentBadge({ sentiment }: { sentiment: string | null }) {
+  if (!sentiment) return <span className="text-text-muted text-xs">—</span>
+  const map: Record<string, { label: string; cls: string }> = {
+    positive: { label: 'Ijobiy', cls: 'badge-success' },
+    negative: { label: 'Salbiy', cls: 'badge-danger' },
+    neutral:  { label: 'Neytral', cls: 'badge-neutral' },
+  }
+  const s = map[sentiment] || map['neutral']
+  return <span className={`badge ${s.cls}`}>{s.label}</span>
+}
+
+const IconPhone = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.85a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.03z" />
+  </svg>
+)
+
+const IconPlay = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+    <polygon points="5 3 19 12 5 21 5 3" />
+  </svg>
+)
+
+const IconEye = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
 
 export default async function CallsPage() {
   const session = await getServerSession(authOptions)
@@ -59,100 +90,111 @@ export default async function CallsPage() {
   const [calls, managers] = await Promise.all([getCalls(filterManagerId), getManagers(filterManagerId)])
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between">
+    <div className="max-w-7xl mx-auto space-y-6 animate-fade-up">
+
+      {/* Page header */}
+      <div className="flex items-center justify-between">
         <div>
-          <div className="text-xs font-mono text-[#FF6B35] uppercase tracking-widest mb-1">
-            Replix AI / Qo'ng'iroqlar
-          </div>
-          <h1 className="text-3xl font-display font-700 text-white">Qo'ng'iroqlar</h1>
-          <p className="text-[#9494B8] font-mono text-sm mt-1">
-            Jami {calls.length} ta qo'ng'iroq
+          <h1 className="text-2xl font-display font-bold text-text-primary tracking-tight">
+            Qo'ng'iroqlar
+          </h1>
+          <p className="text-sm text-text-secondary mt-0.5">
+            Jami <span className="font-data text-text-primary">{calls.length}</span> ta qo'ng'iroq
           </p>
         </div>
         {isAdmin && <UploadCallModal managers={managers} />}
       </div>
 
-      {/* Table */}
-      <div className="bg-[#0D0D1A] border border-[#1E1E35] rounded-xl overflow-hidden">
+      {/* Table card */}
+      <div className="card overflow-hidden">
         {calls.length === 0 ? (
-          <div className="py-24 text-center">
-            <div className="text-5xl mb-4">📞</div>
-            <h3 className="font-display font-600 text-white text-lg mb-2">Qo'ng'iroqlar yo'q</h3>
-            <p className="text-[#5555AA] font-mono text-sm mb-6">
+          <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-bg-elevated flex items-center justify-center mb-4 text-text-muted">
+              <IconPhone />
+            </div>
+            <h3 className="text-base font-semibold text-text-primary mb-1">
+              Qo'ng'iroqlar yo'q
+            </h3>
+            <p className="text-sm text-text-secondary mb-5 max-w-xs">
               Birinchi audio qo'ng'iroqni yuklang va AI tahlilini oling
             </p>
             {isAdmin && <UploadCallModal managers={managers} />}
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="data-table">
               <thead>
-                <tr className="border-b border-[#1E1E35]">
-                  {['Sana', 'Manager', 'Fayl', 'Baho', 'Natija', 'Mijoz', 'Xulosa', ''].map(h => (
-                    <th key={h} className="px-5 py-3 text-left text-xs font-mono text-[#5555AA] uppercase tracking-wider">
-                      {h}
-                    </th>
-                  ))}
+                <tr>
+                  <th style={{ width: '120px' }}>Sana</th>
+                  <th style={{ width: '160px' }}>Manager</th>
+                  <th style={{ width: '140px' }}>Fayl</th>
+                  <th style={{ width: '72px' }}>Baho</th>
+                  <th style={{ width: '110px' }}>Natija</th>
+                  <th style={{ width: '100px' }}>Mijoz</th>
+                  <th>Xulosa</th>
+                  <th style={{ width: '72px' }}></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1E1E35]">
+              <tbody>
                 {calls.map(call => (
-                  <tr key={call.id} className="hover:bg-[#111122] transition-colors">
-                    <td className="px-5 py-3.5 text-xs font-mono text-[#5555AA] whitespace-nowrap">
-                      {format(new Date(call.createdAt), 'dd.MM.yyyy')}
-                      <br />
-                      <span className="text-[#333360]">{format(new Date(call.createdAt), 'HH:mm')}</span>
+                  <tr key={call.id} className="group">
+                    <td>
+                      <div className="font-data text-xs text-text-secondary">
+                        {format(new Date(call.createdAt), 'dd.MM.yyyy')}
+                      </div>
+                      <div className="font-data text-2xs text-text-muted mt-0.5">
+                        {format(new Date(call.createdAt), 'HH:mm')}
+                      </div>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <Link href={`/managers/${call.managerId}`} className="flex items-center gap-2 hover:text-[#FF6B35] transition-colors group">
-                        <div className="w-7 h-7 rounded-full bg-[#FF6B35]/10 border border-[#FF6B35]/20 flex items-center justify-center text-xs font-display font-600 text-[#FF6B35] flex-shrink-0">
+                    <td>
+                      <Link href={`/managers/${call.managerId}`} className="flex items-center gap-2 hover:text-brand-orange transition-colors">
+                        <div className="w-6 h-6 rounded-full bg-brand-orange-dim border border-brand-orange-muted flex items-center justify-center text-[11px] font-semibold text-brand-orange flex-shrink-0">
                           {call.manager.name.charAt(0)}
                         </div>
-                        <span className="text-sm font-display text-white group-hover:text-[#FF6B35] transition-colors">
+                        <span className="text-sm font-medium text-text-primary group-hover:text-brand-orange transition-colors truncate">
                           {call.manager.name}
                         </span>
                       </Link>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span className="text-xs font-mono text-[#5555AA] max-w-[120px] truncate block">
-                        {call.audioFileName}
-                      </span>
+                    <td>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-brand-orange hover:bg-brand-orange-dim transition-colors opacity-0 group-hover:opacity-100"
+                          title="Audio tinglash"
+                        >
+                          <IconPlay />
+                        </button>
+                        <span className="font-data text-xs text-text-muted max-w-[100px] truncate">
+                          {call.audioFileName || '—'}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <StarDisplay rating={call.rating} />
+                    <td>
+                      <RatingDisplay rating={call.rating} />
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td>
                       <OutcomeBadge outcome={call.callOutcome} />
                     </td>
-                    <td className="px-5 py-3.5">
-                      {call.clientSentiment && (
-                        <span className={`badge ${
-                          call.clientSentiment === 'positive' ? 'badge-success' :
-                          call.clientSentiment === 'negative' ? 'badge-danger' : 'badge-neutral'
-                        }`}>
-                          {call.clientSentiment === 'positive' ? '😊' : call.clientSentiment === 'negative' ? '😞' : '😐'}
-                          {' '}{call.clientSentiment === 'positive' ? 'Ijobiy' : call.clientSentiment === 'negative' ? 'Salbiy' : 'Neytral'}
-                        </span>
-                      )}
+                    <td>
+                      <SentimentBadge sentiment={call.clientSentiment} />
                     </td>
-                    <td className="px-5 py-3.5 max-w-[200px]">
+                    <td>
                       {call.summary ? (
-                        <p className="text-xs font-mono text-[#9494B8] line-clamp-2">{call.summary}</p>
+                        <p className="text-xs text-text-secondary line-clamp-2 max-w-[220px]">
+                          {call.summary}
+                        </p>
                       ) : (
-                        <span className="text-xs font-mono text-[#333360] italic">Tahlil yo'q</span>
+                        <span className="text-xs text-text-muted italic">Tahlil yo'q</span>
                       )}
                     </td>
-                    <td className="px-3 py-3.5">
+                    <td>
                       <div className="flex items-center gap-1">
-                        <Link href={`/calls/${call.id}`}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#5555AA] hover:text-[#FF6B35] hover:bg-[#FF6B35]/10 transition-colors"
-                          title="Ko'rish va Audio tinglash">
-                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
+                        <Link
+                          href={`/calls/${call.id}`}
+                          className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-brand-orange hover:bg-brand-orange-dim transition-colors"
+                          title="Ko'rish"
+                        >
+                          <IconEye />
                         </Link>
                         <DeleteCallButton callId={call.id} />
                       </div>
