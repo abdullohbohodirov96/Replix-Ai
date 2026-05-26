@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "npx prisma generate && next build",
     "render:build": "npm install && npx prisma generate && next build",
-    "start": "npx prisma db push && next start",
+    "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
