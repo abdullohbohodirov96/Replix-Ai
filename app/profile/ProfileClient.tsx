@@ -1,5 +1,5 @@
 'use client'
-import { useState, useTransition, useOptimistic } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 type Criteria = { id: string; name: string; description: string | null; order: number; weight?: number }
@@ -7,6 +7,18 @@ type CallCategory = { id: string; name: string; description: string | null; colo
 type LeadCategory = { id: string; name: string; label: string; description: string | null; color: string; order: number; criteria: Criteria[] }
 type Manager = { id: string; name: string; email: string | null; phone: string | null; position: string | null; createdAt: string }
 type Integration = { id: string; name: string; enabled: boolean; config: unknown; lastSync: string | null }
+type ProjectStats = {
+  id: string
+  name: string
+  adminEmail: string | null
+  adminPass: string | null
+  createdAt: string
+  company: { id: string; name: string; description: string | null } | null
+  managerCount: number
+  adminCount: number
+  totalCalls: number
+  sales: number
+}
 
 interface Props {
   user: { id: string; name: string | null; email: string; role: string; managerId: string | null; createdAt: Date } | null
@@ -16,17 +28,20 @@ interface Props {
   managers: Manager[]
   integrations: Integration[]
   isAdmin: boolean
+  isSuperAdmin?: boolean
   managerCount: number
+  allProjects?: ProjectStats[]
 }
 
 const TABS = [
-  { id: 'profile', label: 'Profil', adminOnly: false },
-  { id: 'criteria', label: 'Suhbat mezonlari', adminOnly: true },
-  { id: 'metrics', label: 'Suhbat metrikalari', adminOnly: true },
-  { id: 'lead-quality', label: 'Lid sifati', adminOnly: true },
-  { id: 'managers', label: 'Menejerlar', adminOnly: true },
-  { id: 'notifications', label: 'Bildirishnomalar', adminOnly: true },
-  { id: 'integrations', label: 'Integratsiyalar', adminOnly: true },
+  { id: 'profile', label: 'Profil', adminOnly: false, superAdminOnly: false },
+  { id: 'companies', label: 'Kompaniyalar', adminOnly: false, superAdminOnly: true },
+  { id: 'criteria', label: 'Suhbat mezonlari', adminOnly: true, superAdminOnly: false },
+  { id: 'metrics', label: 'Suhbat metrikalari', adminOnly: true, superAdminOnly: false },
+  { id: 'lead-quality', label: 'Lid sifati', adminOnly: true, superAdminOnly: false },
+  { id: 'managers', label: 'Menejerlar', adminOnly: true, superAdminOnly: false },
+  { id: 'notifications', label: 'Bildirishnomalar', adminOnly: true, superAdminOnly: false },
+  { id: 'integrations', label: 'Integratsiyalar', adminOnly: true, superAdminOnly: false },
 ]
 
 const COLORS = ['#3b82f6', '#f97316', '#22c55e', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b', '#ec4899']
@@ -65,7 +80,7 @@ const PlusIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
 )
 
-export default function ProfileClient({ user, company, callCategories: initCallCats, leadCategories: initLeadCats, managers: initManagers, integrations, isAdmin, managerCount }: Props) {
+export default function ProfileClient({ user, company, callCategories: initCallCats, leadCategories: initLeadCats, managers: initManagers, integrations, isAdmin, isSuperAdmin, managerCount, allProjects = [] }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const activeTab = searchParams.get('tab') || 'profile'
@@ -123,6 +138,17 @@ export default function ProfileClient({ user, company, callCategories: initCallC
   const [newMgrPhone, setNewMgrPhone] = useState('')
   const [newMgrPos, setNewMgrPos] = useState('')
   const [mgrSaving, setMgrSaving] = useState(false)
+
+  // Companies tab (superadmin)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(allProjects[0]?.id ?? null)
+  const [showAddProject, setShowAddProject] = useState(false)
+  const [newProjName, setNewProjName] = useState('')
+  const [newProjAdminName, setNewProjAdminName] = useState('')
+  const [newProjAdminEmail, setNewProjAdminEmail] = useState('')
+  const [newProjAdminPass, setNewProjAdminPass] = useState('')
+  const [projSaving, setProjSaving] = useState(false)
+  const [projError, setProjError] = useState('')
+  const selectedProject = allProjects.find(p => p.id === selectedProjectId) ?? null
 
   // --- API helpers ---
   const saveProfile = async () => {
@@ -248,7 +274,41 @@ export default function ProfileClient({ user, company, callCategories: initCallC
     refresh()
   }
 
-  const visibleTabs = TABS.filter(t => !t.adminOnly || isAdmin)
+  const createProject = async () => {
+    if (!newProjName.trim() || !newProjAdminEmail.trim() || !newProjAdminPass.trim()) {
+      setProjError("Kompaniya nomi, admin email va parol majburiy")
+      return
+    }
+    setProjSaving(true); setProjError('')
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newProjName, adminName: newProjAdminName || newProjAdminEmail, adminEmail: newProjAdminEmail, adminPassword: newProjAdminPass }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setProjError(d.error || 'Xatolik yuz berdi')
+        return
+      }
+      setNewProjName(''); setNewProjAdminName(''); setNewProjAdminEmail(''); setNewProjAdminPass('')
+      setShowAddProject(false)
+      refresh()
+    } finally { setProjSaving(false) }
+  }
+
+  const deleteProject = async (id: string) => {
+    if (!confirm("Kompaniyani o'chirish? Barcha ma'lumotlar o'chadi.")) return
+    if (selectedProjectId === id) setSelectedProjectId(allProjects.find(p => p.id !== id)?.id ?? null)
+    await fetch(`/api/projects?id=${id}`, { method: 'DELETE' })
+    refresh()
+  }
+
+  const visibleTabs = TABS.filter(t => {
+    if (t.superAdminOnly) return isSuperAdmin
+    if (t.adminOnly) return isAdmin
+    return true
+  })
   const filteredManagers = managers.filter(m =>
     m.name.toLowerCase().includes(managerSearch.toLowerCase()) ||
     (m.email || '').toLowerCase().includes(managerSearch.toLowerCase())
@@ -419,6 +479,198 @@ export default function ProfileClient({ user, company, callCategories: initCallC
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===== KOMPANIYALAR (SUPERADMIN) ===== */}
+      {activeTab === 'companies' && isSuperAdmin && (
+        <div className="flex gap-5" style={{ minHeight: 'calc(100vh - 220px)' }}>
+          {/* Left: project list */}
+          <div className="w-72 flex-shrink-0 flex flex-col gap-2">
+            <button
+              onClick={() => { setShowAddProject(true); setSelectedProjectId(null) }}
+              className="flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-lg transition-colors w-full"
+            >
+              <PlusIcon />
+              Yangi kompaniya
+            </button>
+
+            {allProjects.length === 0 ? (
+              <div className="card p-6 text-center text-xs text-text-muted">Kompaniyalar yo&apos;q</div>
+            ) : allProjects.map(p => (
+              <button key={p.id} onClick={() => { setSelectedProjectId(p.id); setShowAddProject(false) }}
+                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                  selectedProjectId === p.id && !showAddProject
+                    ? 'bg-[#f9731615] border-[#f9731640]'
+                    : 'bg-bg-card border-bg-border hover:bg-bg-elevated'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
+                    style={{ background: '#f9731620', color: '#f97316' }}>
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-text-primary truncate">{p.name}</div>
+                    <div className="text-xs text-text-muted truncate">{p.adminEmail || 'Admin yo\'q'}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-bg-border">
+                  <span className="text-xs text-text-muted"><span className="font-semibold text-text-primary">{p.managerCount}</span> menejer</span>
+                  <span className="text-xs text-text-muted"><span className="font-semibold text-[#22c55e]">{p.sales}</span> sotuv</span>
+                  <span className="text-xs text-text-muted"><span className="font-semibold text-text-secondary">{p.totalCalls}</span> tahlil</span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Right: detail panel */}
+          <div className="flex-1 min-w-0">
+            {showAddProject ? (
+              <div className="card p-6 max-w-lg">
+                <div className="section-title mb-4">Yangi kompaniya yaratish</div>
+                {projError && (
+                  <div className="mb-3 px-3 py-2 bg-status-danger/10 border border-status-danger/20 rounded-md text-xs text-status-danger">{projError}</div>
+                )}
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-text-muted mb-1.5 block">Kompaniya nomi *</label>
+                    <input value={newProjName} onChange={e => setNewProjName(e.target.value)} className="input-field" placeholder="Masalan: ABC Kompaniyasi" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-text-muted mb-1.5 block">Admin ismi</label>
+                    <input value={newProjAdminName} onChange={e => setNewProjAdminName(e.target.value)} className="input-field" placeholder="Admin ismi" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-text-muted mb-1.5 block">Admin email *</label>
+                    <input value={newProjAdminEmail} onChange={e => setNewProjAdminEmail(e.target.value)} className="input-field" placeholder="admin@company.uz" type="email" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-text-muted mb-1.5 block">Admin paroli *</label>
+                    <input value={newProjAdminPass} onChange={e => setNewProjAdminPass(e.target.value)} className="input-field" placeholder="Kuchli parol" type="password" />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={createProject} disabled={projSaving || !newProjName.trim() || !newProjAdminEmail.trim() || !newProjAdminPass.trim()}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-brand-orange rounded-md disabled:opacity-50">
+                    {projSaving ? 'Yaratilmoqda...' : 'Yaratish'}
+                  </button>
+                  <button onClick={() => { setShowAddProject(false); setProjError('') }}
+                    className="px-4 py-2 text-sm text-text-muted border border-bg-border rounded-md hover:bg-bg-elevated">
+                    Bekor
+                  </button>
+                </div>
+              </div>
+            ) : selectedProject ? (
+              <div className="space-y-4">
+                {/* Header card */}
+                <div className="card p-5">
+                  <div className="flex items-start justify-between mb-5">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 text-2xl font-bold"
+                        style={{ background: '#f9731620', color: '#f97316', border: '2px solid #f9731630' }}>
+                        {selectedProject.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="text-xl font-bold text-text-primary">{selectedProject.name}</div>
+                        <div className="text-sm text-text-muted mt-0.5">{selectedProject.adminEmail || 'Admin email yo\'q'}</div>
+                        <div className="text-xs text-text-dim mt-0.5">
+                          Yaratilgan: {new Date(selectedProject.createdAt).toLocaleDateString('uz-UZ')}
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => deleteProject(selectedProject.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#ef44441a] hover:bg-[#ef444430] text-[#ef4444] rounded-md border border-[#ef444430] transition-colors">
+                      <TrashIcon />
+                      O&apos;chirish
+                    </button>
+                  </div>
+
+                  {/* Stats grid */}
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="rounded-lg p-4 text-center bg-bg-elevated">
+                      <div className="text-2xl font-bold text-text-primary">{selectedProject.managerCount}</div>
+                      <div className="text-xs text-text-muted mt-1">Menejerlar</div>
+                    </div>
+                    <div className="rounded-lg p-4 text-center bg-bg-elevated">
+                      <div className="text-2xl font-bold text-text-primary">{selectedProject.adminCount}</div>
+                      <div className="text-xs text-text-muted mt-1">Adminlar</div>
+                    </div>
+                    <div className="rounded-lg p-4 text-center bg-bg-elevated">
+                      <div className="text-2xl font-bold text-[#3b82f6]">{selectedProject.totalCalls}</div>
+                      <div className="text-xs text-text-muted mt-1">Audio tahlillar</div>
+                    </div>
+                    <div className="rounded-lg p-4 text-center bg-bg-elevated">
+                      <div className="text-2xl font-bold text-[#22c55e]">{selectedProject.sales}</div>
+                      <div className="text-xs text-text-muted mt-1">Sotuvlar</div>
+                    </div>
+                  </div>
+
+                  {/* Conversion rate */}
+                  {selectedProject.totalCalls > 0 && (
+                    <div className="mt-3 p-3 rounded-lg bg-bg-elevated flex items-center justify-between">
+                      <span className="text-xs text-text-muted">Konversiya darajasi</span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-40 h-2 bg-bg-base rounded-full overflow-hidden">
+                          <div className="h-full bg-[#22c55e] rounded-full"
+                            style={{ width: `${Math.round((selectedProject.sales / selectedProject.totalCalls) * 100)}%` }} />
+                        </div>
+                        <span className="text-sm font-bold text-[#22c55e]">
+                          {Math.round((selectedProject.sales / selectedProject.totalCalls) * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Company info */}
+                {selectedProject.company && (
+                  <div className="card p-5">
+                    <div className="section-title mb-3">Kompaniya haqida</div>
+                    {selectedProject.company.description ? (
+                      <p className="text-sm text-text-secondary leading-relaxed">{selectedProject.company.description}</p>
+                    ) : (
+                      <p className="text-sm text-text-muted italic">Ma&apos;lumot kiritilmagan</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Quick summary */}
+                <div className="card p-5">
+                  <div className="section-title mb-3">Tezkor ma&apos;lumot</div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 border-b border-bg-border">
+                      <span className="text-xs text-text-muted">Kompaniya ID</span>
+                      <span className="text-xs font-mono text-text-secondary">{selectedProject.id.slice(0, 16)}...</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-bg-border">
+                      <span className="text-xs text-text-muted">Admin email</span>
+                      <span className="text-xs text-text-primary">{selectedProject.adminEmail || '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-bg-border">
+                      <span className="text-xs text-text-muted">Jami qo&apos;ng&apos;iroqlar</span>
+                      <span className="text-xs font-semibold text-text-primary">{selectedProject.totalCalls}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <span className="text-xs text-text-muted">Muvaffaqiyatli sotuvlar</span>
+                      <span className="text-xs font-semibold text-[#22c55e]">{selectedProject.sales}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="w-16 h-16 rounded-2xl bg-[#f9731615] flex items-center justify-center mb-4">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.75">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                </div>
+                <div className="text-sm font-semibold text-text-secondary mb-1">Kompaniya tanlang</div>
+                <div className="text-xs text-text-muted">Chap paneldan kompaniyani bosing</div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

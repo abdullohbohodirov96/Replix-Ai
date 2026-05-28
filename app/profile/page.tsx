@@ -13,6 +13,7 @@ export default async function ProfilePage() {
   const userEmail = session.user?.email!
   const sessionUser = session.user as { role?: string; projectId?: string | null }
   const isAdmin = sessionUser?.role === 'admin' || sessionUser?.role === 'superadmin'
+  const isSuperAdmin = sessionUser?.role === 'superadmin'
   const projectId = sessionUser?.projectId ?? null
   const projectFilter = projectId ? { projectId } : {}
 
@@ -47,6 +48,43 @@ export default async function ProfilePage() {
     isAdmin ? prisma.manager.count({ where: projectFilter }) : Promise.resolve(0),
   ])
 
+  // For superadmin: fetch all projects with per-project analytics
+  let allProjects: any[] = []
+  if (isSuperAdmin) {
+    const [projects, callStats] = await Promise.all([
+      prisma.project.findMany({
+        include: {
+          company: { select: { id: true, name: true, description: true } },
+          _count: { select: { managers: true } },
+          users: { where: { role: { in: ['admin'] } }, select: { id: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.$queryRaw<{ projectId: string; total: bigint; sales: bigint }[]>`
+        SELECT m."projectId",
+          COUNT(c.id) as total,
+          SUM(CASE WHEN c."callOutcome" = 'sale' THEN 1 ELSE 0 END) as sales
+        FROM "Call" c
+        JOIN "Manager" m ON c."managerId" = m.id
+        WHERE m."projectId" IS NOT NULL
+        GROUP BY m."projectId"
+      `,
+    ])
+
+    allProjects = projects.map(p => ({
+      id: p.id,
+      name: p.name,
+      adminEmail: p.adminEmail,
+      adminPass: p.adminPass,
+      createdAt: p.createdAt.toISOString(),
+      company: p.company,
+      managerCount: p._count.managers,
+      adminCount: p.users.length,
+      totalCalls: Number(callStats.find((s: any) => s.projectId === p.id)?.total ?? 0),
+      sales: Number(callStats.find((s: any) => s.projectId === p.id)?.sales ?? 0),
+    }))
+  }
+
   return (
     <ProfileClient
       user={user}
@@ -56,7 +94,9 @@ export default async function ProfilePage() {
       managers={managers as any}
       integrations={integrations as any}
       isAdmin={isAdmin}
+      isSuperAdmin={isSuperAdmin}
       managerCount={managerCount}
+      allProjects={allProjects}
     />
   )
 }
