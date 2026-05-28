@@ -10,24 +10,51 @@ export default async function ProfilePage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
-  const sessionUser = session.user as { role?: string; managerId?: string | null }
-  const isAdmin = sessionUser.role === 'admin'
+  const userEmail = session.user?.email!
+  const sessionUser = session.user as { role?: string; projectId?: string | null }
+  const isAdmin = sessionUser?.role === 'admin' || sessionUser?.role === 'superadmin'
+  const projectId = sessionUser?.projectId ?? null
+  const projectFilter = projectId ? { projectId } : {}
 
-  const [user, company, managerCount] = await Promise.all([
-    prisma.user.findFirst({
-      where: { email: session.user?.email || '' },
+  const [user, company, callCategories, leadCategories, managers, integrations, managerCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { email: userEmail },
       select: { id: true, name: true, email: true, role: true, managerId: true, createdAt: true },
     }),
     isAdmin ? prisma.company.findFirst() : Promise.resolve(null),
-    isAdmin ? prisma.manager.count() : Promise.resolve(0),
+    isAdmin
+      ? prisma.callCategory.findMany({
+          include: { criteria: { orderBy: { order: 'asc' } } },
+          orderBy: { order: 'asc' },
+        })
+      : Promise.resolve([]),
+    isAdmin
+      ? prisma.leadCategory.findMany({
+          include: { criteria: { orderBy: { order: 'asc' } } },
+          orderBy: { order: 'asc' },
+        })
+      : Promise.resolve([]),
+    isAdmin
+      ? prisma.manager.findMany({
+          where: projectFilter,
+          select: { id: true, name: true, email: true, phone: true, position: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        })
+      : Promise.resolve([]),
+    isAdmin ? prisma.integration.findMany({ orderBy: { name: 'asc' } }) : Promise.resolve([]),
+    isAdmin ? prisma.manager.count({ where: projectFilter }) : Promise.resolve(0),
   ])
 
   return (
     <ProfileClient
       user={user}
       company={company}
+      callCategories={callCategories as any}
+      leadCategories={leadCategories as any}
+      managers={managers as any}
+      integrations={integrations as any}
       isAdmin={isAdmin}
-      managerCount={managerCount || 0}
+      managerCount={managerCount}
     />
   )
 }

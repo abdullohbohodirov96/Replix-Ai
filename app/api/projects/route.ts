@@ -8,10 +8,12 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
-  if ((session?.user as { role?: string })?.role !== 'admin')
+  if ((session?.user as { role?: string })?.role !== 'superadmin')
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const projects = await prisma.project.findMany({
-    include: { managers: { select: { id: true, name: true, position: true } } },
+    include: {
+      _count: { select: { users: true, managers: true } },
+    },
     orderBy: { createdAt: 'desc' },
   })
   return NextResponse.json(projects.map(p => ({ ...p, adminPass: undefined })))
@@ -19,31 +21,43 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if ((session?.user as { role?: string })?.role !== 'admin')
+  if ((session?.user as { role?: string })?.role !== 'superadmin')
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const body = await req.json()
   const hashedPass = body.adminPass ? await bcrypt.hash(body.adminPass, 10) : null
   const project = await prisma.project.create({
     data: { name: body.name, adminEmail: body.adminEmail, adminPass: hashedPass },
   })
+
+  if (body.adminEmail && body.adminPassword) {
+    const hashedUserPass = await bcrypt.hash(body.adminPassword, 10)
+    await prisma.user.create({
+      data: {
+        name: body.adminName || body.adminEmail,
+        email: body.adminEmail,
+        password: hashedUserPass,
+        role: 'admin',
+        projectId: project.id,
+      },
+    })
+  }
+
   return NextResponse.json({ ...project, adminPass: undefined })
 }
 
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if ((session?.user as { role?: string })?.role !== 'admin')
+  if ((session?.user as { role?: string })?.role !== 'superadmin')
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const body = await req.json()
-  const { id, adminPass, ...data } = body
-  const updateData: Record<string, unknown> = { ...data }
-  if (adminPass) updateData.adminPass = await bcrypt.hash(adminPass, 10)
-  const project = await prisma.project.update({ where: { id }, data: updateData })
+  const { id, name } = body
+  const project = await prisma.project.update({ where: { id }, data: { name } })
   return NextResponse.json({ ...project, adminPass: undefined })
 }
 
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if ((session?.user as { role?: string })?.role !== 'admin')
+  if ((session?.user as { role?: string })?.role !== 'superadmin')
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')!
