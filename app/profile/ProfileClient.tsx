@@ -1,8 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useTransition, useOptimistic } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-type Criteria = { id: string; name: string; description: string | null; order: number }
+type Criteria = { id: string; name: string; description: string | null; order: number; weight?: number }
 type CallCategory = { id: string; name: string; description: string | null; color: string; order: number; criteria: Criteria[] }
 type LeadCategory = { id: string; name: string; label: string; description: string | null; color: string; order: number; criteria: Criteria[] }
 type Manager = { id: string; name: string; email: string | null; phone: string | null; position: string | null; createdAt: string }
@@ -37,24 +37,52 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
       {COLORS.map(c => (
         <button key={c} type="button" onClick={() => onChange(c)}
           className="w-5 h-5 rounded-full border-2 transition-all flex-shrink-0"
-          style={{ background: c, borderColor: value === c ? '#ffffff' : 'transparent', outline: value === c ? `2px solid ${c}40` : 'none' }}
+          style={{ background: c, borderColor: value === c ? '#fff' : 'transparent', outline: value === c ? `2px solid ${c}40` : 'none' }}
         />
       ))}
     </div>
   )
 }
 
-export default function ProfileClient({ user, company, callCategories, leadCategories, managers, integrations, isAdmin, managerCount }: Props) {
+const DragIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-text-dim flex-shrink-0 cursor-grab">
+    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+    <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+  </svg>
+)
+const TrashIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+  </svg>
+)
+const EditIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+)
+const PlusIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+)
+
+export default function ProfileClient({ user, company, callCategories: initCallCats, leadCategories: initLeadCats, managers: initManagers, integrations, isAdmin, managerCount }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const activeTab = searchParams.get('tab') || 'profile'
-  const setTab = (tab: string) => router.push(`/profile?tab=${tab}`)
-  const refresh = () => router.refresh()
+  const [isPending, startTransition] = useTransition()
 
-  // Profile tab
+  const setTab = (tab: string) => router.push(`/profile?tab=${tab}`, { scroll: false })
+  const refresh = () => startTransition(() => router.refresh())
+
+  // Local optimistic state
+  const [callCats, setCallCats] = useState(initCallCats)
+  const [leadCats, setLeadCats] = useState(initLeadCats)
+  const [managers, setManagers] = useState(initManagers)
+
+  // Profile tab state
+  const [editMode, setEditMode] = useState(false)
   const [name, setName] = useState(user?.name || '')
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [companyName, setCompanyName] = useState(company?.name || '')
   const [companyDesc, setCompanyDesc] = useState(company?.description || '')
   const [companyIndustry, setCompanyIndustry] = useState(company?.industry || '')
@@ -63,24 +91,29 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
   const [compSaved, setCompSaved] = useState(false)
 
   // Criteria tab
-  const [selectedCatId, setSelectedCatId] = useState<string | null>(callCategories[0]?.id ?? null)
+  const [selectedCatId, setSelectedCatId] = useState<string | null>(initCallCats[0]?.id ?? null)
   const [newCatName, setNewCatName] = useState('')
   const [newCatDesc, setNewCatDesc] = useState('')
   const [newCatColor, setNewCatColor] = useState('#3b82f6')
   const [showAddCat, setShowAddCat] = useState(false)
   const [newCritName, setNewCritName] = useState('')
   const [newCritDesc, setNewCritDesc] = useState('')
-  const selectedCat = callCategories.find(c => c.id === selectedCatId)
+  const [addCritLoading, setAddCritLoading] = useState(false)
+  const selectedCat = callCats.find(c => c.id === selectedCatId)
+
+  // Metrics tab
+  const [selectedMetCatId, setSelectedMetCatId] = useState<string | null>(initCallCats[0]?.id ?? null)
 
   // Lead quality tab
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(leadCategories[0]?.id ?? null)
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(initLeadCats[0]?.id ?? null)
   const [newLeadCatName, setNewLeadCatName] = useState('')
   const [newLeadCatLabel, setNewLeadCatLabel] = useState('')
   const [newLeadCatColor, setNewLeadCatColor] = useState('#f97316')
   const [showAddLeadCat, setShowAddLeadCat] = useState(false)
   const [newLeadCritName, setNewLeadCritName] = useState('')
   const [newLeadCritDesc, setNewLeadCritDesc] = useState('')
-  const selectedLeadCat = leadCategories.find(c => c.id === selectedLeadId)
+  const [leadBannerOpen, setLeadBannerOpen] = useState(true)
+  const selectedLeadCat = leadCats.find(c => c.id === selectedLeadId)
 
   // Managers tab
   const [managerSearch, setManagerSearch] = useState('')
@@ -91,12 +124,13 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
   const [newMgrPos, setNewMgrPos] = useState('')
   const [mgrSaving, setMgrSaving] = useState(false)
 
-  // ---- API helpers ----
+  // --- API helpers ---
   const saveProfile = async () => {
     setSaving(true)
     try {
       await fetch('/api/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
-      setSaved(true); setTimeout(() => setSaved(false), 2000)
+      setEditMode(false)
+      refresh()
     } finally { setSaving(false) }
   }
 
@@ -105,72 +139,113 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
     try {
       await fetch('/api/company', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: companyName, description: companyDesc, industry: companyIndustry, aiContext }) })
       setCompSaved(true); setTimeout(() => setCompSaved(false), 2000)
+      refresh()
     } finally { setCompSaving(false) }
   }
 
   const addCallCat = async () => {
     if (!newCatName.trim()) return
+    const tempId = `temp_${Date.now()}`
+    const tempCat: CallCategory = { id: tempId, name: newCatName, description: newCatDesc || null, color: newCatColor, order: callCats.length, criteria: [] }
+    setCallCats(prev => [...prev, tempCat])
+    setSelectedCatId(tempId)
+    setNewCatName(''); setNewCatDesc(''); setShowAddCat(false)
     const r = await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newCatName, description: newCatDesc || undefined, color: newCatColor }) })
     const cat = await r.json()
-    setNewCatName(''); setNewCatDesc(''); setShowAddCat(false); setSelectedCatId(cat.id)
+    setCallCats(prev => prev.map(c => c.id === tempId ? { ...c, id: cat.id } : c))
+    setSelectedCatId(cat.id)
     refresh()
   }
 
   const deleteCallCat = async (id: string) => {
     if (!confirm("Kategoriyani o'chirish? Barcha mezonlar ham o'chadi.")) return
+    setCallCats(prev => prev.filter(c => c.id !== id))
+    if (selectedCatId === id) setSelectedCatId(callCats.find(c => c.id !== id)?.id ?? null)
     await fetch(`/api/categories?id=${id}`, { method: 'DELETE' })
-    if (selectedCatId === id) setSelectedCatId(callCategories.find(c => c.id !== id)?.id ?? null)
     refresh()
   }
 
   const addCriteria = async (categoryId: string) => {
     if (!newCritName.trim()) return
-    await fetch('/api/criteria', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newCritName, description: newCritDesc || undefined, categoryId }) })
-    setNewCritName(''); setNewCritDesc(''); refresh()
+    setAddCritLoading(true)
+    const tempId = `temp_${Date.now()}`
+    const tempCrit: Criteria = { id: tempId, name: newCritName, description: newCritDesc || null, order: selectedCat?.criteria.length ?? 0 }
+    setCallCats(prev => prev.map(c => c.id === categoryId ? { ...c, criteria: [...c.criteria, tempCrit] } : c))
+    setNewCritName(''); setNewCritDesc('')
+    try {
+      const r = await fetch('/api/criteria', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newCritName, description: newCritDesc || undefined, categoryId }) })
+      const crit = await r.json()
+      setCallCats(prev => prev.map(c => c.id === categoryId ? { ...c, criteria: c.criteria.map(cr => cr.id === tempId ? { ...cr, id: crit.id } : cr) } : c))
+      refresh()
+    } finally { setAddCritLoading(false) }
   }
 
-  const deleteCriteria = async (id: string) => {
-    await fetch(`/api/criteria?id=${id}`, { method: 'DELETE' }); refresh()
+  const deleteCriteria = async (catId: string, critId: string) => {
+    setCallCats(prev => prev.map(c => c.id === catId ? { ...c, criteria: c.criteria.filter(cr => cr.id !== critId) } : c))
+    await fetch(`/api/criteria?id=${critId}`, { method: 'DELETE' })
+    refresh()
   }
 
   const addLeadCat = async () => {
     if (!newLeadCatName.trim() || !newLeadCatLabel.trim()) return
+    const tempId = `temp_${Date.now()}`
+    const tempCat: LeadCategory = { id: tempId, name: newLeadCatName, label: newLeadCatLabel, description: null, color: newLeadCatColor, order: leadCats.length, criteria: [] }
+    setLeadCats(prev => [...prev, tempCat])
+    setSelectedLeadId(tempId)
+    setNewLeadCatName(''); setNewLeadCatLabel(''); setShowAddLeadCat(false)
     const r = await fetch('/api/lead-categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newLeadCatName, label: newLeadCatLabel, color: newLeadCatColor }) })
     const cat = await r.json()
-    setNewLeadCatName(''); setNewLeadCatLabel(''); setShowAddLeadCat(false); setSelectedLeadId(cat.id)
+    setLeadCats(prev => prev.map(c => c.id === tempId ? { ...c, id: cat.id } : c))
+    setSelectedLeadId(cat.id)
     refresh()
   }
 
   const deleteLeadCat = async (id: string) => {
     if (!confirm("Lead kategoriyasini o'chirish?")) return
+    setLeadCats(prev => prev.filter(c => c.id !== id))
+    if (selectedLeadId === id) setSelectedLeadId(leadCats.find(c => c.id !== id)?.id ?? null)
     await fetch(`/api/lead-categories?id=${id}`, { method: 'DELETE' })
-    if (selectedLeadId === id) setSelectedLeadId(leadCategories.find(c => c.id !== id)?.id ?? null)
     refresh()
   }
 
   const addLeadCrit = async (leadCategoryId: string) => {
     if (!newLeadCritName.trim()) return
-    await fetch('/api/lead-criteria', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newLeadCritName, description: newLeadCritDesc || undefined, leadCategoryId }) })
-    setNewLeadCritName(''); setNewLeadCritDesc(''); refresh()
+    const tempId = `temp_${Date.now()}`
+    const tempCrit: Criteria = { id: tempId, name: newLeadCritName, description: newLeadCritDesc || null, order: selectedLeadCat?.criteria.length ?? 0 }
+    setLeadCats(prev => prev.map(c => c.id === leadCategoryId ? { ...c, criteria: [...c.criteria, tempCrit] } : c))
+    setNewLeadCritName(''); setNewLeadCritDesc('')
+    const r = await fetch('/api/lead-criteria', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newLeadCritName, description: newLeadCritDesc || undefined, leadCategoryId }) })
+    const crit = await r.json()
+    setLeadCats(prev => prev.map(c => c.id === leadCategoryId ? { ...c, criteria: c.criteria.map(cr => cr.id === tempId ? { ...cr, id: crit.id } : cr) } : c))
+    refresh()
   }
 
-  const deleteLeadCrit = async (id: string) => {
-    await fetch(`/api/lead-criteria?id=${id}`, { method: 'DELETE' }); refresh()
+  const deleteLeadCrit = async (catId: string, critId: string) => {
+    setLeadCats(prev => prev.map(c => c.id === catId ? { ...c, criteria: c.criteria.filter(cr => cr.id !== critId) } : c))
+    await fetch(`/api/lead-criteria?id=${critId}`, { method: 'DELETE' })
+    refresh()
   }
 
   const addManager = async () => {
     if (!newMgrName.trim()) return
     setMgrSaving(true)
+    const tempId = `temp_${Date.now()}`
+    const tempMgr: Manager = { id: tempId, name: newMgrName, email: newMgrEmail || null, phone: newMgrPhone || null, position: newMgrPos || null, createdAt: new Date().toISOString() }
+    setManagers(prev => [tempMgr, ...prev])
+    setNewMgrName(''); setNewMgrEmail(''); setNewMgrPhone(''); setNewMgrPos(''); setShowAddMgr(false)
     try {
-      await fetch('/api/managers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newMgrName, email: newMgrEmail || undefined, phone: newMgrPhone || undefined, position: newMgrPos || undefined }) })
-      setNewMgrName(''); setNewMgrEmail(''); setNewMgrPhone(''); setNewMgrPos('')
-      setShowAddMgr(false); refresh()
+      const r = await fetch('/api/managers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newMgrName, email: newMgrEmail || undefined, phone: newMgrPhone || undefined, position: newMgrPos || undefined }) })
+      const mgr = await r.json()
+      setManagers(prev => prev.map(m => m.id === tempId ? { ...m, id: mgr.id } : m))
+      refresh()
     } finally { setMgrSaving(false) }
   }
 
   const deleteManager = async (id: string) => {
     if (!confirm("Managerni o'chirish? Uning barcha qo'ng'iroqlari ham o'chadi.")) return
-    await fetch(`/api/managers?id=${id}`, { method: 'DELETE' }); refresh()
+    setManagers(prev => prev.filter(m => m.id !== id))
+    await fetch(`/api/managers?id=${id}`, { method: 'DELETE' })
+    refresh()
   }
 
   const visibleTabs = TABS.filter(t => !t.adminOnly || isAdmin)
@@ -178,34 +253,21 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
     m.name.toLowerCase().includes(managerSearch.toLowerCase()) ||
     (m.email || '').toLowerCase().includes(managerSearch.toLowerCase())
   )
-
-  const DragIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-text-dim flex-shrink-0">
-      <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-      <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-    </svg>
-  )
-  const TrashIcon = () => (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-    </svg>
-  )
-  const PlusIcon = () => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-  )
+  const weightPct = (w?: number) => {
+    if (!w) return 'Teng ahamiyat darajasi'
+    return `${Math.round(w * 100)}%`
+  }
 
   return (
     <div className="animate-fade-up">
-      <div className="mb-4">
-        <h1 className="text-xl font-bold text-text-primary">Profil sozlamalari</h1>
-      </div>
+      <h1 className="text-2xl font-bold text-text-primary mb-5">Profil sozlamalari</h1>
 
-      {/* Tabs — underline style */}
+      {/* Tabs */}
       <div className="border-b border-bg-border mb-6">
-        <div className="flex overflow-x-auto">
+        <div className="flex overflow-x-auto gap-1">
           {visibleTabs.map(tab => (
             <button key={tab.id} onClick={() => setTab(tab.id)}
-              className={`px-4 pb-3 pt-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
+              className={`px-4 pb-3 pt-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-all flex-shrink-0 ${
                 activeTab === tab.id ? 'border-brand-orange text-text-primary' : 'border-transparent text-text-muted hover:text-text-primary'
               }`}>
               {tab.label}
@@ -214,78 +276,147 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
         </div>
       </div>
 
-      {/* ===== PROFIL ===== */}
+      {/* ===== PROFIL TAB ===== */}
       {activeTab === 'profile' && (
-        <div className="max-w-2xl space-y-5">
-          <div className="card p-5">
-            <div className="section-title mb-4">Profil ma&apos;lumotlari</div>
-            <div className="flex items-center gap-4 mb-5 pb-5 border-b border-bg-border">
-              <div className="w-14 h-14 rounded-full bg-brand-orange-dim border-2 border-brand-orange-muted flex items-center justify-center text-xl font-bold text-brand-orange flex-shrink-0">
-                {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <div className="font-bold text-text-primary">{user?.name || 'Foydalanuvchi'}</div>
-                <div className="text-xs text-text-muted mt-0.5">{user?.email}</div>
-                <div className="mt-1.5">
-                  <span className={`badge ${user?.role === 'admin' || user?.role === 'superadmin' ? 'badge-warning' : 'badge-neutral'}`}>
-                    {user?.role === 'superadmin' ? 'CEO / Superadmin' : user?.role === 'admin' ? 'Administrator' : 'Foydalanuvchi'}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-text-muted mb-1.5 block">Ism</label>
-                <input value={name} onChange={e => setName(e.target.value)} className="input-field" placeholder="Ismingiz" />
-              </div>
-              <div>
-                <label className="text-xs text-text-muted mb-1.5 block">Email</label>
-                <input value={user?.email || ''} disabled className="input-field opacity-50 cursor-not-allowed" />
-              </div>
-            </div>
-            <button onClick={saveProfile} disabled={saving} className="mt-4 px-4 py-2 text-sm font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors disabled:opacity-50">
-              {saving ? 'Saqlanmoqda...' : saved ? '✓ Saqlandi' : 'Saqlash'}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: 'Rolim', value: user?.role === 'superadmin' ? 'CEO' : user?.role === 'admin' ? 'Admin' : 'User' },
-              { label: 'Managerlar', value: isAdmin ? String(managerCount) : '—' },
-              { label: "Ro'yxatdan o'tgan", value: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('uz-UZ') : '—' },
-            ].map(s => (
-              <div key={s.label} className="metric-card">
-                <div className="metric-value text-xl">{s.value}</div>
-                <div className="metric-label">{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {isAdmin && (
-            <div className="card p-5">
-              <div className="section-title mb-1">Kompaniya sozlamalari</div>
-              <p className="text-xs text-text-muted mb-4">AI tahlil ushbu ma&apos;lumotlarga asoslanib suhbatlarni baholaydi</p>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-text-muted mb-1.5 block">Kompaniya nomi</label>
-                  <input value={companyName} onChange={e => setCompanyName(e.target.value)} className="input-field" placeholder="Mening kompaniyam" />
-                </div>
-                <div>
-                  <label className="text-xs text-text-muted mb-1.5 block">Soha</label>
-                  <input value={companyIndustry} onChange={e => setCompanyIndustry(e.target.value)} className="input-field" placeholder="Masalan: Qurilish materiallari" />
-                </div>
-                <div>
-                  <label className="text-xs text-text-muted mb-1.5 block">Tavsif</label>
-                  <textarea value={companyDesc} onChange={e => setCompanyDesc(e.target.value)} className="input-field" rows={2} placeholder="Kompaniya haqida qisqacha" />
-                </div>
-                <div>
-                  <label className="text-xs text-text-muted mb-1.5 block">AI konteksti <span className="text-text-dim">(suhbat baholash uchun asosiy qoidalar)</span></label>
-                  <textarea value={aiContext} onChange={e => setAiContext(e.target.value)} className="input-field" rows={5} placeholder="Masalan: Biz qurilish materiali sotamiz..." />
-                </div>
-              </div>
-              <button onClick={saveCompany} disabled={compSaving} className="mt-4 px-4 py-2 text-sm font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors disabled:opacity-50">
-                {compSaving ? 'Saqlanmoqda...' : compSaved ? '✓ Saqlandi' : 'Saqlash'}
+        <div className="max-w-3xl space-y-5">
+          {/* Profil ma'lumotlari card */}
+          <div className="card overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-bg-border">
+              <span className="section-title">Profil ma&apos;lumotlari</span>
+              <button onClick={() => setEditMode(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Profilni tahrirlash
               </button>
+            </div>
+            {/* Company logo card */}
+            <div className="p-5 bg-bg-elevated/50">
+              <div className="rounded-xl bg-bg-card border border-bg-border p-8 flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-full bg-[#1e3a5f] border-4 border-[#1e40af30] flex items-center justify-center mb-4">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.75">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                </div>
+                <div className="text-lg font-bold text-text-primary">{company?.name || user?.name || 'Kompaniya'}</div>
+                <div className="text-xs text-text-muted mt-1">{(company?.name || user?.name || '').toLowerCase().replace(/\s+/g, '')}</div>
+                <div className="text-xs text-text-muted">{user?.email}</div>
+              </div>
+            </div>
+
+            {editMode && (
+              <div className="p-5 border-t border-bg-border space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-text-muted mb-1.5 block">Ism</label>
+                    <input value={name} onChange={e => setName(e.target.value)} className="input-field" placeholder="Ismingiz" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-text-muted mb-1.5 block">Email</label>
+                    <input value={user?.email || ''} disabled className="input-field opacity-50" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={saveProfile} disabled={saving} className="px-4 py-2 text-sm font-semibold text-white bg-brand-orange rounded-md disabled:opacity-50">
+                    {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+                  </button>
+                  <button onClick={() => setEditMode(false)} className="px-4 py-2 text-sm text-text-muted border border-bg-border rounded-md hover:bg-bg-elevated">Bekor</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* TARIF VA FOYDALANISH */}
+          <div>
+            <div className="text-xs font-bold text-text-muted tracking-widest uppercase mb-3">Tarif va foydalanish</div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="card p-4">
+                <div className="text-xs text-text-muted mb-1">Tarif rejasi</div>
+                <div className="text-2xl font-bold text-text-primary">Pro</div>
+                <div className="text-sm font-semibold text-text-secondary mt-1">1 150 000 so&apos;m / oy</div>
+                <div className="text-xs text-text-muted mt-1">Kunlik limit: 2 soat har bir menejer uchun</div>
+              </div>
+              <div className="card p-4">
+                <div className="text-xs text-text-muted mb-1">Jami menejerlar</div>
+                <div className="text-2xl font-bold text-text-primary">{managerCount}</div>
+                <div className="text-xs text-[#22c55e] font-semibold mt-1">{managerCount} faol obuna</div>
+              </div>
+              <div className="card p-4">
+                <div className="text-xs text-text-muted mb-1">Bugungi foydalanish</div>
+                <div className="text-2xl font-bold text-text-primary">0 daqiqa</div>
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs text-brand-orange font-semibold">0 daqiqa / 2 soat (0%)</span>
+                </div>
+                <div className="w-full h-1.5 bg-bg-elevated rounded-full mt-1.5 overflow-hidden">
+                  <div className="h-full bg-brand-orange rounded-full" style={{ width: '0%' }} />
+                </div>
+                <div className="text-xs text-text-muted mt-1">2 soat bugun qoldi</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3 mt-3">
+              <div className="card p-4">
+                <div className="text-xs text-text-muted mb-1">Oylik to&apos;lov</div>
+                <div className="text-lg font-bold text-text-primary">1 150 000 so&apos;m</div>
+                <div className="text-xs text-text-muted mt-1">1 ta faol obuna</div>
+              </div>
+              <div className="card p-4">
+                <div className="text-xs text-text-muted mb-2">Obuna holati</div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-text-muted">Faol:</span>
+                  <span className="text-[#22c55e] font-bold">1</span>
+                </div>
+                <div className="flex justify-between text-xs mt-1">
+                  <span className="text-text-muted">Jami:</span>
+                  <span className="font-bold text-text-primary">1</span>
+                </div>
+              </div>
+              <div className="card p-4">
+                <div className="text-xs text-text-muted mb-1">Keyingi to&apos;lov sanasi</div>
+                <div className="text-lg font-bold text-text-primary">26.06.2026</div>
+                <div className="text-xs text-text-muted mt-1">Yaqin 4 hafta ichida</div>
+              </div>
+            </div>
+          </div>
+
+          {/* KOMPANIYA HAQIDA */}
+          {isAdmin && (
+            <div>
+              <div className="text-xs font-bold text-text-muted tracking-widest uppercase mb-3">Kompaniya haqida</div>
+              <div className="card p-4">
+                {!editMode ? (
+                  <>
+                    {company?.aiContext ? (
+                      <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{company.aiContext}</p>
+                    ) : (
+                      <p className="text-sm text-text-muted italic">AI konteksti qo&apos;shilmagan. Profilni tahrirlash tugmasini bosib qo&apos;shing.</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-text-muted mb-1.5 block">Kompaniya nomi</label>
+                        <input value={companyName} onChange={e => setCompanyName(e.target.value)} className="input-field" placeholder="Mening kompaniyam" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-text-muted mb-1.5 block">Soha</label>
+                        <input value={companyIndustry} onChange={e => setCompanyIndustry(e.target.value)} className="input-field" placeholder="Qurilish materiallari" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-text-muted mb-1.5 block">Tavsif</label>
+                      <textarea value={companyDesc} onChange={e => setCompanyDesc(e.target.value)} className="input-field" rows={2} placeholder="Kompaniya haqida qisqacha" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-text-muted mb-1.5 block">AI konteksti <span className="text-text-dim">(suhbat baholash uchun asosiy qoidalar)</span></label>
+                      <textarea value={aiContext} onChange={e => setAiContext(e.target.value)} className="input-field" rows={6} placeholder="Masalan: Biz qurilish materiali sotamiz. Menejerlar mijozga salomlashib, ehtiyojni aniqlab, keyin taklifni bildirishi kerak..." />
+                    </div>
+                    <button onClick={saveCompany} disabled={compSaving} className="px-4 py-2 text-sm font-semibold text-white bg-brand-orange rounded-md disabled:opacity-50">
+                      {compSaving ? 'Saqlanmoqda...' : compSaved ? '✓ Saqlandi' : 'Saqlash'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -293,18 +424,21 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
 
       {/* ===== SUHBAT MEZONLARI ===== */}
       {activeTab === 'criteria' && isAdmin && (
-        <div className="flex gap-4" style={{ height: 'calc(100vh - 220px)' }}>
-          <div className="w-72 flex-shrink-0 flex flex-col gap-2">
+        <div className="flex gap-4" style={{ minHeight: 'calc(100vh - 220px)' }}>
+          {/* Left panel */}
+          <div className="w-72 flex-shrink-0 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-text-primary">Kategoriyalar</span>
-              <button onClick={() => setShowAddCat(v => !v)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
+              <span className="font-bold text-text-primary">Kategoriyalar</span>
+              <button onClick={() => setShowAddCat(v => !v)}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
                 <PlusIcon /> Yangi kategoriya
               </button>
             </div>
+
             {showAddCat && (
               <div className="card p-3 space-y-2">
-                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} className="input-field" placeholder="Kategoriya nomi" />
-                <input value={newCatDesc} onChange={e => setNewCatDesc(e.target.value)} className="input-field" placeholder="Tavsif (ixtiyoriy)" />
+                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} className="input-field" placeholder="Kategoriya nomi *" />
+                <textarea value={newCatDesc} onChange={e => setNewCatDesc(e.target.value)} className="input-field text-xs" rows={2} placeholder="Tavsif (AI uchun qoidalar)..." />
                 <div><div className="text-xs text-text-muted mb-1.5">Rang</div><ColorPicker value={newCatColor} onChange={setNewCatColor} /></div>
                 <div className="flex gap-2">
                   <button onClick={addCallCat} disabled={!newCatName.trim()} className="flex-1 py-1.5 text-xs font-semibold text-white bg-brand-orange rounded-md disabled:opacity-50">Qo&apos;shish</button>
@@ -312,60 +446,91 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
                 </div>
               </div>
             )}
-            <div className="flex-1 overflow-y-auto space-y-1">
-              {callCategories.length === 0 && <p className="text-xs text-text-muted text-center py-6">Hali kategoriyalar qo&apos;shilmagan</p>}
-              {callCategories.map(cat => (
+
+            <div className="flex-1 space-y-1.5">
+              {callCats.length === 0 && <p className="text-xs text-text-muted text-center py-8">Hali kategoriyalar qo&apos;shilmagan</p>}
+              {callCats.map(cat => (
                 <div key={cat.id} onClick={() => setSelectedCatId(cat.id)}
-                  className={`group flex items-center gap-2 p-3 rounded-lg cursor-pointer border transition-colors ${selectedCatId === cat.id ? 'border-brand-orange bg-brand-orange-dim' : 'border-bg-border hover:bg-bg-elevated'}`}>
+                  className={`group flex items-center gap-2 p-3 rounded-lg cursor-pointer border transition-all ${selectedCatId === cat.id ? 'border-brand-orange bg-brand-orange-dim' : 'border-bg-border hover:bg-bg-elevated'}`}>
                   <DragIcon />
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cat.color }} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-text-primary truncate">{cat.name}</div>
-                    {cat.description && <div className="text-xs text-text-muted truncate">{cat.description}</div>}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-text-primary truncate">{cat.name}</span>
+                      <span className="text-xs text-text-muted">({cat.criteria.length})</span>
+                    </div>
+                    {cat.description && <div className="text-xs text-text-muted truncate mt-0.5">{cat.description}</div>}
                   </div>
-                  <span className="text-xs text-text-dim font-mono bg-bg-card px-1.5 py-0.5 rounded">({cat.criteria.length})</span>
-                  <button onClick={e => { e.stopPropagation(); deleteCallCat(cat.id) }} className="p-1 text-text-muted hover:text-status-danger opacity-0 group-hover:opacity-100 transition-opacity">
-                    <TrashIcon />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={e => { e.stopPropagation(); deleteCallCat(cat.id) }} className="p-1 text-text-muted hover:text-status-danger"><TrashIcon /></button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col min-w-0 gap-2">
+          {/* Right panel */}
+          <div className="flex-1 flex flex-col min-w-0 gap-3">
             {selectedCat ? (
               <>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-text-primary">&quot;{selectedCat.name}&quot; mezonlari</span>
-                  <span className="text-xs text-text-muted">{selectedCat.criteria.length} ta mezon</span>
+                  <span className="font-bold text-text-primary">&quot;{selectedCat.name}&quot; mezonlari</span>
+                  <div className="flex items-center gap-2">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-bg-border rounded-md text-text-secondary hover:bg-bg-elevated transition-colors">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                      Me&apos;zon darajalarini o&apos;zgartirish
+                    </button>
+                    <button
+                      onClick={() => { const el = document.getElementById('new-crit-input'); el?.focus() }}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
+                      <PlusIcon /> Yangi mezon
+                    </button>
+                  </div>
                 </div>
+
+                {/* Add criteria form */}
                 <div className="card p-3 flex gap-2">
                   <div className="flex-1 space-y-2">
-                    <input value={newCritName} onChange={e => setNewCritName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCriteria(selectedCat.id)} className="input-field" placeholder="Mezon nomi..." />
-                    <input value={newCritDesc} onChange={e => setNewCritDesc(e.target.value)} className="input-field" placeholder="Tavsif (ixtiyoriy)..." />
+                    <input id="new-crit-input" value={newCritName} onChange={e => setNewCritName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && addCriteria(selectedCat.id)}
+                      className="input-field" placeholder="Mezon nomi (Enter tugmasini bosing)..." />
+                    <textarea value={newCritDesc} onChange={e => setNewCritDesc(e.target.value)}
+                      className="input-field text-xs" rows={2} placeholder="Qoidalar / tavsif (AI uchun)..." />
                   </div>
-                  <button onClick={() => addCriteria(selectedCat.id)} disabled={!newCritName.trim()} className="px-3 text-sm font-bold text-white bg-brand-orange rounded-md disabled:opacity-50 self-stretch">+</button>
+                  <button onClick={() => addCriteria(selectedCat.id)} disabled={!newCritName.trim() || addCritLoading}
+                    className="px-3 text-sm font-bold text-white bg-brand-orange rounded-md disabled:opacity-50 self-stretch">
+                    {addCritLoading ? '...' : '+'}
+                  </button>
                 </div>
-                <div className="flex-1 overflow-y-auto space-y-2">
-                  {selectedCat.criteria.length === 0 && <p className="text-xs text-text-muted text-center py-8">Hali mezon qo&apos;shilmagan</p>}
+
+                {/* Criteria list */}
+                <div className="space-y-2 overflow-y-auto flex-1">
+                  {selectedCat.criteria.length === 0 && <p className="text-xs text-text-muted text-center py-10">Hali mezon qo&apos;shilmagan</p>}
                   {selectedCat.criteria.map((c, i) => (
-                    <div key={c.id} className="group card p-3 flex items-start gap-3">
+                    <div key={c.id} className="group card p-4 flex items-start gap-3">
                       <DragIcon />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-text-primary">{i + 1}. {c.name}</div>
-                        {c.description && <div className="text-xs text-text-muted mt-0.5 leading-relaxed">{c.description}</div>}
+                        <div className="font-bold text-text-primary mb-0.5">{i + 1}. {c.name}</div>
+                        <div className="text-xs text-text-muted mb-2">
+                          Ahamiyat darajasi (%): {selectedCat.criteria.length > 0 ? `Teng ahamiyat darajasi (~${Math.round(100/selectedCat.criteria.length)}% har biri)` : 'Teng ahamiyat darajasi'}
+                        </div>
+                        {c.description && (
+                          <div className="text-xs text-text-secondary leading-relaxed">
+                            <span className="font-semibold text-text-primary">Qoidalar:</span>
+                            <div className="mt-1 whitespace-pre-wrap">{c.description}</div>
+                          </div>
+                        )}
                       </div>
-                      <button onClick={() => deleteCriteria(c.id)} className="p-1 text-text-muted hover:text-status-danger opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                        <TrashIcon />
-                      </button>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                        <button className="p-1.5 text-text-muted hover:text-brand-orange rounded transition-colors"><EditIcon /></button>
+                        <span className="text-text-dim">|</span>
+                        <button onClick={() => deleteCriteria(selectedCat.id, c.id)} className="p-1.5 text-text-muted hover:text-status-danger rounded transition-colors"><TrashIcon /></button>
+                      </div>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-text-muted text-sm">Chap paneldan kategoriya tanlang</p>
-              </div>
+              <div className="flex-1 flex items-center justify-center text-text-muted text-sm">Chap paneldan kategoriya tanlang</div>
             )}
           </div>
         </div>
@@ -373,30 +538,75 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
 
       {/* ===== SUHBAT METRIKALARI ===== */}
       {activeTab === 'metrics' && isAdmin && (
-        <div className="card p-10 text-center text-text-muted text-sm">Suhbat metrikalari tez orada qo&apos;shiladi</div>
+        <div className="flex gap-4" style={{ minHeight: 'calc(100vh - 220px)' }}>
+          {/* Left panel */}
+          <div className="w-72 flex-shrink-0 space-y-1.5">
+            <div className="font-bold text-text-primary mb-3">Kategoriyalar</div>
+            {callCats.map(cat => (
+              <div key={cat.id} onClick={() => setSelectedMetCatId(cat.id)}
+                className={`flex items-start gap-2 p-3 rounded-lg cursor-pointer border transition-all ${selectedMetCatId === cat.id ? 'border-brand-orange bg-brand-orange-dim' : 'border-bg-border hover:bg-bg-elevated'}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-bold text-text-primary truncate">{cat.name}</span>
+                    <span className="text-xs text-text-muted">(0)</span>
+                  </div>
+                  {cat.description && <div className="text-xs text-text-muted truncate mt-0.5">{cat.description}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Right panel */}
+          <div className="flex-1 flex flex-col min-w-0 gap-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-text-primary">
+                {callCats.find(c => c.id === selectedMetCatId) ? `«${callCats.find(c => c.id === selectedMetCatId)!.name}» kategoriyasi metrikalari` : 'Kategoriya metrikalari'}
+              </span>
+              <button className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
+                <PlusIcon /> Yangi metrika
+              </button>
+            </div>
+            <div className="flex-1 card flex flex-col items-center justify-center gap-3 text-center p-10">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-muted opacity-50">
+                <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+              <div className="text-sm font-bold text-text-primary">Bu kategoriyada metrikalar yo&apos;q</div>
+              <div className="text-xs text-text-muted">Yuqoridagi «Yangi metrika» tugmasini bosing</div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ===== LID SIFATI ===== */}
       {activeTab === 'lead-quality' && isAdmin && (
-        <div>
-          <div className="card p-4 border-l-2 border-brand-orange mb-5 flex items-start gap-3">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-orange mt-0.5 flex-shrink-0">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <div>
-              <div className="text-sm font-bold text-text-primary">Lid sifati shu tartibda baholanadi</div>
-              <p className="text-xs text-text-muted mt-1 leading-relaxed">Har bir kategoriya mezonlariga ball beriladi: mos kelsa 1, mos kelmasa 0, noaniq bo&apos;lsa 0.5. Eng yuqori o&apos;rtacha ball bo&apos;lgan kategoriya tanlanadi.</p>
-            </div>
+        <div className="space-y-4">
+          {/* Info banner */}
+          <div className="card border border-[#1e3a5f] bg-[#0d1f33]">
+            <button onClick={() => setLeadBannerOpen(v => !v)} className="w-full flex items-center justify-between p-4">
+              <div className="flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span className="text-sm font-bold text-text-primary">Lid sifati shu tartibda baholanadi</span>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-text-muted transition-transform ${leadBannerOpen ? '' : 'rotate-180'}`}><polyline points="18 15 12 9 6 15"/></svg>
+            </button>
+            {leadBannerOpen && (
+              <div className="px-4 pb-4 text-xs text-text-muted leading-relaxed border-t border-[#1e3a5f] pt-3">
+                Har bir kategoriya mezonlariga ball beriladi: mos kelsa 1, mos kelmasa 0, noaniq bo&apos;lsa 0.5. Eng yuqori o&apos;rtacha ball bo&apos;lgan kategoriya tanlanadi.
+              </div>
+            )}
           </div>
 
-          <div className="flex gap-4" style={{ height: 'calc(100vh - 320px)' }}>
-            <div className="w-72 flex-shrink-0 flex flex-col gap-2">
+          <div className="flex gap-4" style={{ minHeight: 'calc(100vh - 340px)' }}>
+            {/* Left panel */}
+            <div className="w-72 flex-shrink-0 flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-text-primary">Kategoriyalar</span>
-                <button onClick={() => setShowAddLeadCat(v => !v)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
+                <span className="font-bold text-text-primary">Kategoriyalar</span>
+                <button onClick={() => setShowAddLeadCat(v => !v)}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
                   <PlusIcon /> Yangi kategoriya
                 </button>
               </div>
+
               {showAddLeadCat && (
                 <div className="card p-3 space-y-2">
                   <input value={newLeadCatLabel} onChange={e => setNewLeadCatLabel(e.target.value)} className="input-field" placeholder="Ko'rsatiladigan nom (Issiq lead)" />
@@ -408,60 +618,71 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
                   </div>
                 </div>
               )}
-              <div className="flex-1 overflow-y-auto space-y-1">
-                {leadCategories.length === 0 && <p className="text-xs text-text-muted text-center py-6">Hali kategoriyalar qo&apos;shilmagan</p>}
-                {leadCategories.map((cat, idx) => (
+
+              <div className="flex-1 space-y-1.5">
+                {leadCats.length === 0 && <p className="text-xs text-text-muted text-center py-8">Hali kategoriyalar qo&apos;shilmagan</p>}
+                {leadCats.map((cat, idx) => (
                   <div key={cat.id} onClick={() => setSelectedLeadId(cat.id)}
-                    className={`group flex items-center gap-2 p-3 rounded-lg cursor-pointer border transition-colors ${selectedLeadId === cat.id ? 'border-brand-orange bg-brand-orange-dim' : 'border-bg-border hover:bg-bg-elevated'}`}>
+                    className={`group flex items-center gap-2 p-3 rounded-lg cursor-pointer border transition-all ${selectedLeadId === cat.id ? 'border-brand-orange bg-brand-orange-dim' : 'border-bg-border hover:bg-bg-elevated'}`}>
                     <DragIcon />
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cat.color }} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-text-primary">{idx + 1}. {cat.label}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-text-primary">{idx + 1}. {cat.label}</span>
+                        <span className="text-xs text-text-muted">({cat.criteria.length})</span>
+                      </div>
                     </div>
-                    <span className="text-xs text-text-dim font-mono bg-bg-card px-1.5 py-0.5 rounded">({cat.criteria.length})</span>
-                    <button onClick={e => { e.stopPropagation(); deleteLeadCat(cat.id) }} className="p-1 text-text-muted hover:text-status-danger opacity-0 group-hover:opacity-100 transition-opacity">
-                      <TrashIcon />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={e => { e.stopPropagation(); deleteLeadCat(cat.id) }} className="p-1 text-text-muted hover:text-status-danger"><TrashIcon /></button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="flex-1 flex flex-col min-w-0 gap-2">
+            {/* Right panel */}
+            <div className="flex-1 flex flex-col min-w-0 gap-3">
               {selectedLeadCat ? (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-text-primary">&laquo;{selectedLeadCat.label}&raquo; mezonlari</span>
-                    <span className="text-xs text-text-muted">{selectedLeadCat.criteria.length} ta mezon</span>
+                    <span className="font-bold text-text-primary">&laquo;{selectedLeadCat.label}&raquo; mezonlari</span>
+                    <button onClick={() => { const el = document.getElementById('new-lead-crit-input'); el?.focus() }}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
+                      <PlusIcon /> Yangi mezon
+                    </button>
                   </div>
+
                   <div className="card p-3 flex gap-2">
                     <div className="flex-1 space-y-2">
-                      <input value={newLeadCritName} onChange={e => setNewLeadCritName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addLeadCrit(selectedLeadCat.id)} className="input-field" placeholder="Mezon nomi..." />
+                      <input id="new-lead-crit-input" value={newLeadCritName} onChange={e => setNewLeadCritName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && addLeadCrit(selectedLeadCat.id)}
+                        className="input-field" placeholder="Mezon nomi..." />
                       <input value={newLeadCritDesc} onChange={e => setNewLeadCritDesc(e.target.value)} className="input-field" placeholder="Tavsif..." />
                     </div>
-                    <button onClick={() => addLeadCrit(selectedLeadCat.id)} disabled={!newLeadCritName.trim()} className="px-3 text-sm font-bold text-white bg-brand-orange rounded-md disabled:opacity-50 self-stretch">+</button>
+                    <button onClick={() => addLeadCrit(selectedLeadCat.id)} disabled={!newLeadCritName.trim()}
+                      className="px-3 text-sm font-bold text-white bg-brand-orange rounded-md disabled:opacity-50 self-stretch">+</button>
                   </div>
-                  <div className="flex-1 overflow-y-auto space-y-2">
-                    {selectedLeadCat.criteria.length === 0 && <p className="text-xs text-text-muted text-center py-8">Hali mezon qo&apos;shilmagan</p>}
+
+                  <div className="space-y-2 overflow-y-auto flex-1">
+                    {selectedLeadCat.criteria.length === 0 && <p className="text-xs text-text-muted text-center py-10">Hali mezon qo&apos;shilmagan</p>}
                     {selectedLeadCat.criteria.map((c, i) => (
-                      <div key={c.id} className="group card p-3 flex items-start gap-3">
+                      <div key={c.id} className="group card p-4 flex items-start gap-3">
                         <DragIcon />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-text-primary">{i + 1}.</div>
-                          <div className="text-xs text-text-muted mt-0.5 leading-relaxed">{c.name}</div>
-                          {c.description && <div className="text-xs text-text-dim mt-0.5">{c.description}</div>}
+                          <div className="font-bold text-text-primary mb-1">{i + 1}.</div>
+                          <div className="text-sm text-text-secondary">{c.name}</div>
+                          {c.description && <div className="text-xs text-text-muted mt-1">{c.description}</div>}
                         </div>
-                        <button onClick={() => deleteLeadCrit(c.id)} className="p-1 text-text-muted hover:text-status-danger opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                          <TrashIcon />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <button className="p-1.5 text-text-muted hover:text-brand-orange rounded"><EditIcon /></button>
+                          <span className="text-text-dim">|</span>
+                          <button onClick={() => deleteLeadCrit(selectedLeadCat.id, c.id)} className="p-1.5 text-text-muted hover:text-status-danger rounded"><TrashIcon /></button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </>
               ) : (
-                <div className="flex-1 flex items-center justify-center">
-                  <p className="text-text-muted text-sm">Chap paneldan kategoriya tanlang</p>
-                </div>
+                <div className="flex-1 flex items-center justify-center text-text-muted text-sm">Chap paneldan kategoriya tanlang</div>
               )}
             </div>
           </div>
@@ -473,7 +694,8 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-text-primary">Menejerlar</h2>
-            <button onClick={() => setShowAddMgr(v => !v)} className="flex items-center gap-1 px-4 py-2 text-sm font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
+            <button onClick={() => setShowAddMgr(v => !v)}
+              className="flex items-center gap-1 px-4 py-2 text-sm font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
               <PlusIcon /> Yangi menejer
             </button>
           </div>
@@ -484,8 +706,8 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div><label className="text-xs text-text-muted mb-1 block">Ism *</label><input value={newMgrName} onChange={e => setNewMgrName(e.target.value)} className="input-field" placeholder="To'liq ism" /></div>
                 <div><label className="text-xs text-text-muted mb-1 block">Lavozim</label><input value={newMgrPos} onChange={e => setNewMgrPos(e.target.value)} className="input-field" placeholder="Sales Manager" /></div>
-                <div><label className="text-xs text-text-muted mb-1 block">Email</label><input value={newMgrEmail} onChange={e => setNewMgrEmail(e.target.value)} className="input-field" placeholder="email@example.com" type="email" /></div>
-                <div><label className="text-xs text-text-muted mb-1 block">Telefon</label><input value={newMgrPhone} onChange={e => setNewMgrPhone(e.target.value)} className="input-field" placeholder="+998 90 123 45 67" /></div>
+                <div><label className="text-xs text-text-muted mb-1 block">Email</label><input value={newMgrEmail} onChange={e => setNewMgrEmail(e.target.value)} className="input-field" type="email" /></div>
+                <div><label className="text-xs text-text-muted mb-1 block">Telefon</label><input value={newMgrPhone} onChange={e => setNewMgrPhone(e.target.value)} className="input-field" placeholder="+998901234567" /></div>
               </div>
               <div className="flex gap-2">
                 <button onClick={addManager} disabled={mgrSaving || !newMgrName.trim()} className="px-4 py-2 text-sm font-semibold text-white bg-brand-orange rounded-md disabled:opacity-50">
@@ -497,8 +719,8 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
           )}
 
           <div className="card">
-            <div className="p-3 border-b border-bg-border flex items-center gap-3">
-              <div className="relative flex-1 max-w-xs">
+            <div className="p-3 border-b border-bg-border">
+              <div className="relative max-w-xs">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted">
                   <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
@@ -506,11 +728,7 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
               </div>
             </div>
             <table className="data-table">
-              <thead>
-                <tr>
-                  <th>ID</th><th>Ism</th><th>Email</th><th>Telefon</th><th>Lavozim</th><th>Qo&apos;shilgan</th><th></th>
-                </tr>
-              </thead>
+              <thead><tr><th>ID</th><th>Ism</th><th>Email</th><th>Telefon</th><th>Lavozim</th><th>Qo&apos;shilgan</th><th></th></tr></thead>
               <tbody>
                 {filteredManagers.length === 0 ? (
                   <tr><td colSpan={7} className="text-center py-8 text-text-muted text-sm">Menejerlar topilmadi</td></tr>
@@ -522,16 +740,12 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
                     <td className="text-text-muted">{m.phone || '—'}</td>
                     <td className="text-text-muted">{m.position || 'Sales Manager'}</td>
                     <td className="text-text-muted">{new Date(m.createdAt).toLocaleDateString('uz-UZ')}</td>
-                    <td>
-                      <button onClick={() => deleteManager(m.id)} className="text-xs text-status-danger hover:text-red-400 transition-colors px-2 py-1 font-semibold">O&apos;chirish</button>
-                    </td>
+                    <td><button onClick={() => deleteManager(m.id)} className="text-xs text-status-danger hover:text-red-400 px-2 py-1 font-semibold">O&apos;chirish</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="p-3 border-t border-bg-border">
-              <span className="text-xs text-text-muted">{filteredManagers.length} natija ko&apos;rsatilmoqda</span>
-            </div>
+            <div className="p-3 border-t border-bg-border text-xs text-text-muted">{filteredManagers.length} natija</div>
           </div>
         </div>
       )}
@@ -541,25 +755,25 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
         <div className="max-w-2xl space-y-3">
           <div className="card p-5 text-center">
             <div className="w-12 h-12 rounded-full bg-bg-elevated flex items-center justify-center mx-auto mb-3">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="text-text-muted">
                 <path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6Z"/>
                 <path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/>
               </svg>
             </div>
             <div className="text-sm font-bold text-text-primary mb-1">Telegram bildirishnomalar</div>
             <p className="text-xs text-text-muted mb-4">Qo&apos;ng&apos;iroq tahlillari va kunlik hisobotlarni Telegram orqali oling</p>
-            <button className="px-4 py-2 text-sm font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">Telegram ulash</button>
+            <button className="px-4 py-2 text-sm font-semibold text-white bg-brand-orange rounded-md">Telegram ulash</button>
           </div>
           {[
-            { label: 'Har bir tahlil natijasini yuborish', on: true },
-            { label: 'Faqat muhim holatlarda xabar berish', on: false },
-            { label: 'Kunlik xulosa', on: true },
-            { label: 'Haftalik xulosa', on: true },
-            { label: 'Oylik xulosa', on: true },
+            { label: "Har bir tahlil natijasini yuborish", on: true },
+            { label: "Faqat muhim holatlarda xabar berish", on: false },
+            { label: "Kunlik xulosa", on: true },
+            { label: "Haftalik xulosa", on: true },
+            { label: "Oylik xulosa", on: true },
           ].map(item => (
             <div key={item.label} className="card p-4 flex items-center justify-between">
               <span className="text-sm font-semibold text-text-primary">{item.label}</span>
-              <div className={`w-10 h-5 rounded-full relative cursor-pointer ${item.on ? 'bg-brand-orange' : 'bg-bg-elevated'}`}>
+              <div className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${item.on ? 'bg-brand-orange' : 'bg-bg-elevated border border-bg-border'}`}>
                 <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${item.on ? 'translate-x-5' : 'translate-x-0.5'}`} />
               </div>
             </div>
@@ -584,7 +798,7 @@ export default function ProfileClient({ user, company, callCategories, leadCateg
               <span className={`badge ${intg.enabled ? 'badge-success' : 'badge-neutral'}`}>{intg.enabled ? 'Faol' : 'Nofaol'}</span>
             </div>
           ))}
-          <div className="card p-4 border-dashed border-bg-elevated text-center cursor-pointer hover:bg-bg-elevated transition-colors">
+          <div className="card p-4 border-dashed text-center cursor-pointer hover:bg-bg-elevated transition-colors">
             <div className="text-sm text-text-muted font-semibold">+ Yangi integratsiya</div>
             <p className="text-xs text-text-dim mt-1">Bitrix24, AmoCRM, Yclients va boshqalar</p>
           </div>
