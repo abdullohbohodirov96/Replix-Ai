@@ -6,10 +6,7 @@ import { authOptions } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  const projectId = (session?.user as { projectId?: string | null } | undefined)?.projectId ?? null
   const cats = await prisma.callCategory.findMany({
-    where: { projectId: projectId ?? undefined },
     include: { criteria: { orderBy: { order: 'asc' } } },
     orderBy: { order: 'asc' },
   })
@@ -20,10 +17,9 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if ((session?.user as { role?: string })?.role !== 'admin')
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  const projectId = (session?.user as { projectId?: string | null } | undefined)?.projectId ?? null
   const body = await req.json()
   const cat = await prisma.callCategory.create({
-    data: { name: body.name, description: body.description, color: body.color || '#3b82f6', order: body.order || 0, projectId: projectId ?? undefined },
+    data: { name: body.name, description: body.description, color: body.color || '#3b82f6', order: body.order || 0 },
   })
   return NextResponse.json(cat)
 }

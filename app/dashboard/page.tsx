@@ -80,8 +80,8 @@ export default async function DashboardPage({
         category: { select: { name: true, color: true } },
       },
     }),
-    prisma.callCategory.findMany({ where: { projectId: projectId ?? undefined }, orderBy: { order: 'asc' } }),
-    prisma.leadCategory.findMany({ where: { projectId: projectId ?? undefined }, orderBy: { order: 'asc' } }),
+    prisma.callCategory.findMany({ orderBy: { order: 'asc' } }),
+    prisma.leadCategory.findMany({ orderBy: { order: 'asc' } }),
     prisma.conversationCriteria.findMany({
       where: filterCategoryId ? { categoryId: filterCategoryId } : undefined,
       include: { category: { select: { name: true, color: true } } },
