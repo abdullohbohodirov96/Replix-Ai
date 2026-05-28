@@ -29,6 +29,11 @@ export async function POST(req: NextRequest) {
     data: { name: body.name, adminEmail: body.adminEmail, adminPass: hashedPass },
   })
 
+  // Auto-create company and admin user for this project
+  await prisma.company.create({
+    data: { name: body.name, projectId: project.id },
+  })
+
   if (body.adminEmail && body.adminPassword) {
     const hashedUserPass = await bcrypt.hash(body.adminPassword, 10)
     await prisma.user.create({

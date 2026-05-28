@@ -125,10 +125,11 @@ export async function POST(request: NextRequest) {
       learnedContext = await getRelevantKnowledge(8)
     } catch { /* non-critical */ }
 
-    // Fetch company context + categories for enriched analysis
+    // Fetch project-scoped company context + categories for enriched analysis
+    const projectId = (session.user as { projectId?: string | null })?.projectId ?? null
     const [company, callCategories] = await Promise.all([
-      prisma.company.findFirst().catch(() => null),
-      prisma.callCategory.findMany({ include: { criteria: { orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } }).catch(() => []),
+      prisma.company.findFirst({ where: { projectId: projectId ?? undefined } }).catch(() => null),
+      prisma.callCategory.findMany({ where: { projectId: projectId ?? undefined }, include: { criteria: { orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } }).catch(() => []),
     ])
 
     let extraContext = learnedContext || ''

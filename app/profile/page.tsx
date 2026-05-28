@@ -21,15 +21,17 @@ export default async function ProfilePage() {
       where: { email: userEmail },
       select: { id: true, name: true, email: true, role: true, managerId: true, createdAt: true },
     }),
-    isAdmin ? prisma.company.findFirst() : Promise.resolve(null),
+    isAdmin ? prisma.company.findFirst({ where: { projectId: projectId ?? undefined } }) : Promise.resolve(null),
     isAdmin
       ? prisma.callCategory.findMany({
+          where: { projectId: projectId ?? undefined },
           include: { criteria: { orderBy: { order: 'asc' } } },
           orderBy: { order: 'asc' },
         })
       : Promise.resolve([]),
     isAdmin
       ? prisma.leadCategory.findMany({
+          where: { projectId: projectId ?? undefined },
           include: { criteria: { orderBy: { order: 'asc' } } },
           orderBy: { order: 'asc' },
         })
