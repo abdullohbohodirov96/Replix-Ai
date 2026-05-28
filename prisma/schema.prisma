@@ -24,14 +24,17 @@ model Manager {
 }
 
 model Project {
-  id         String    @id @default(cuid())
-  name       String
-  adminEmail String?
-  adminPass  String?
-  managers   Manager[]
-  users      User[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id             String         @id @default(cuid())
+  name           String
+  adminEmail     String?
+  adminPass      String?
+  managers       Manager[]
+  users          User[]
+  callCategories CallCategory[]
+  leadCategories LeadCategory[]
+  company        Company?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
 model Call {
@@ -72,6 +75,8 @@ model CallCategory {
   color       String                 @default("#3b82f6")
   order       Int                    @default(0)
   isDefault   Boolean                @default(false)
+  projectId   String?
+  project     Project?               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   calls       Call[]
   criteria    ConversationCriteria[]
   createdAt   DateTime               @default(now())
@@ -97,6 +102,8 @@ model LeadCategory {
   description String?
   color       String         @default("#f97316")
   order       Int            @default(0)
+  projectId   String?
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   criteria    LeadCriteria[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
@@ -119,6 +126,8 @@ model Company {
   description String?
   industry    String?
   aiContext   String?
+  projectId   String?  @unique
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
