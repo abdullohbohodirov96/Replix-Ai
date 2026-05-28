@@ -13,7 +13,7 @@ export default function TopBar() {
   const userInitial = userName.charAt(0).toUpperCase()
 
   return (
-    <header className="fixed top-0 left-16 right-0 h-12 bg-bg-base border-b border-bg-border z-40 flex items-center justify-between px-5">
+    <header className="fixed top-0 left-52 right-0 h-12 bg-bg-base border-b border-bg-border z-40 flex items-center justify-between px-5">
       {/* Left: logo + name */}
       <div className="flex items-center gap-2">
         <div className="w-6 h-6 rounded-md bg-brand-orange flex items-center justify-center flex-shrink-0">

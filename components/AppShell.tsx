@@ -18,7 +18,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       <Sidebar />
       <TopBar />
-      <main className="flex-1 lg:ml-16 min-h-screen pt-12">
+      <main className="flex-1 lg:ml-52 min-h-screen pt-12">
         <div className="p-4 md:p-6 animate-fade-in">
           {children}
         </div>
