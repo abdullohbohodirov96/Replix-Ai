@@ -79,9 +79,10 @@ export async function POST(request: NextRequest) {
     const managerId = formData.get('managerId') as string | null
     const clientPhone = (formData.get('clientPhone') as string | null) || null
     const durationSeconds = parseInt(formData.get('durationSeconds') as string || '0', 10) || null
+    const manualTranscript = (formData.get('transcript') as string | null)?.trim() || null
 
-    if (!file) {
-      return NextResponse.json({ error: 'Audio fayl topilmadi' }, { status: 400 })
+    if (!file && !manualTranscript) {
+      return NextResponse.json({ error: 'Audio fayl yoki matn kiritilmagan' }, { status: 400 })
     }
     if (!managerId) {
       return NextResponse.json({ error: 'Manager tanlanmagan' }, { status: 400 })
@@ -133,27 +134,35 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const allowedTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/webm', 'audio/mp4']
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|ogg|m4a|webm|mp4|flac)$/i)) {
-      return NextResponse.json(
-        { error: 'Faqat audio fayllar qabul qilinadi (MP3, WAV, OGG, M4A)' },
-        { status: 400 }
-      )
+    let filePath = ''
+    let buffer = Buffer.from('')
+    let audioFileName = `text_${Date.now()}.txt`
+    let audioMimeType = 'text/plain'
+
+    if (file) {
+      const allowedTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/webm', 'audio/mp4']
+      if (!allowedTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|ogg|m4a|webm|mp4|flac)$/i)) {
+        return NextResponse.json(
+          { error: 'Faqat audio fayllar qabul qilinadi (MP3, WAV, OGG, M4A)' },
+          { status: 400 }
+        )
+      }
+      const uploadsDir = await ensureUploadsDir()
+      audioFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+      filePath = path.join(uploadsDir, audioFileName)
+      const bytes = await file.arrayBuffer()
+      buffer = Buffer.from(bytes)
+      await writeFile(filePath, buffer)
+      audioMimeType = file.type || 'audio/mpeg'
     }
 
-    const uploadsDir = await ensureUploadsDir()
-    const uniqueFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-    const filePath = path.join(uploadsDir, uniqueFileName)
-
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
-
-    let transcription = ''
-    try {
-      transcription = await transcribeAudio(filePath)
-    } catch (err) {
-      console.error('Transcription error:', err)
+    let transcription = manualTranscript || ''
+    if (file && !manualTranscript) {
+      try {
+        transcription = await transcribeAudio(filePath)
+      } catch (err) {
+        console.error('Transcription error:', err)
+      }
     }
 
     let learnedContext = ''
@@ -245,10 +254,10 @@ export async function POST(request: NextRequest) {
     const call = await prisma.call.create({
       data: {
         managerId,
-        audioFileName: file.name,
-        audioPath: filePath,
-        audioData: buffer,
-        audioMimeType: file.type || 'audio/mpeg',
+        audioFileName: file ? file.name : audioFileName,
+        audioPath: filePath || 'text-only',
+        audioData: buffer.length > 0 ? buffer : undefined,
+        audioMimeType,
         duration: durationSeconds || undefined,
         clientPhone: clientPhone || undefined,
         transcription: transcription || null,
@@ -268,7 +277,6 @@ export async function POST(request: NextRequest) {
         status: 'analyzed',
         analyzedAt: new Date(),
       },
-      include: { manager: true },
     })
 
     // Track audio usage for this project
@@ -299,14 +307,14 @@ export async function POST(request: NextRequest) {
       positives: call.positives,
       clientSentiment: call.clientSentiment,
       createdAt: call.createdAt,
-    }, call.manager.name)
+    }, manager.name)
 
     return NextResponse.json({
       success: true,
       call: {
         id: call.id,
         managerId: call.managerId,
-        managerName: call.manager.name,
+        managerName: manager.name,
         audioFileName: call.audioFileName,
         transcription: call.transcription,
         analysis: call.analysis,

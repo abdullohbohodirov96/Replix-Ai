@@ -246,69 +246,85 @@ export default async function CallDetailPage({ params }: { params: { id: string 
       <div className="text-xs font-semibold text-text-muted uppercase tracking-widest px-0.5">Tahlil</div>
 
       {/* ── Umumiy xulosa ── */}
-      {(call.summary || call.analysis) && (
-        <div className="card p-5 space-y-4">
-          <div>
-            <div className="text-base font-bold text-text-primary">Umumiy xulosa</div>
-            <div className="text-xs text-text-muted mt-0.5">Qo&apos;ng&apos;iroq tahlilining umumiy xulosasi</div>
-          </div>
-
-          {call.summary && (
-            <p className="text-sm text-text-secondary leading-relaxed">{call.summary}</p>
-          )}
-
-          {call.analysis && (
-            <div className="space-y-1 pt-1 border-t border-bg-border">
-              <div className="text-sm font-bold text-text-primary pt-3">Mijoz haqida ma&apos;lumot</div>
-              <p className="text-sm text-text-secondary leading-relaxed">{call.analysis}</p>
-            </div>
-          )}
-
-          {call.improvement && (
-            <div className="space-y-1 pt-1 border-t border-bg-border">
-              <div className="text-sm font-bold text-text-primary pt-3">Oxirgi kelishuv</div>
-              <p className="text-sm text-text-secondary leading-relaxed">{call.improvement}</p>
-            </div>
-          )}
-
-          {/* Ijobiy tomonlar */}
-          {positives.length > 0 && (
-            <div className="pt-1 border-t border-bg-border">
-              <div className="text-sm font-bold text-text-primary pt-3 mb-2">Ijobiy tomonlar</div>
-              <ul className="space-y-1.5">
-                {positives.map((p, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-text-secondary">
-                    <svg className="text-green-500 flex-shrink-0 mt-0.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      <div className="card p-5 space-y-4">
+        <div>
+          <div className="text-base font-bold text-text-primary">Umumiy xulosa</div>
+          <div className="text-xs text-text-muted mt-0.5">Qo&apos;ng&apos;iroq tahlilining umumiy xulosasi</div>
         </div>
-      )}
+
+        {!call.summary && !call.analysis && !call.improvement && positives.length === 0 ? (
+          <div className="py-6 text-center space-y-2">
+            <div className="text-text-muted text-sm">Tahlil ma&apos;lumotlari mavjud emas</div>
+            <Link
+              href="/calls/upload"
+              className="inline-flex items-center gap-1.5 text-brand-orange text-sm hover:underline"
+            >
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+              Matn orqali qayta tahlil qilish
+            </Link>
+          </div>
+        ) : (
+          <>
+            {call.summary && (
+              <p className="text-sm text-text-secondary leading-relaxed">{call.summary}</p>
+            )}
+            {call.analysis && (
+              <div className="space-y-1 pt-1 border-t border-bg-border">
+                <div className="text-sm font-bold text-text-primary pt-3">Mijoz haqida ma&apos;lumot</div>
+                <p className="text-sm text-text-secondary leading-relaxed">{call.analysis}</p>
+              </div>
+            )}
+            {call.improvement && (
+              <div className="space-y-1 pt-1 border-t border-bg-border">
+                <div className="text-sm font-bold text-text-primary pt-3">Oxirgi kelishuv</div>
+                <p className="text-sm text-text-secondary leading-relaxed">{call.improvement}</p>
+              </div>
+            )}
+            {positives.length > 0 && (
+              <div className="pt-1 border-t border-bg-border">
+                <div className="text-sm font-bold text-text-primary pt-3 mb-2">Ijobiy tomonlar</div>
+                <ul className="space-y-1.5">
+                  {positives.map((p, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-text-secondary">
+                      <svg className="text-green-500 flex-shrink-0 mt-0.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* ── Keyingi qadamlar ── */}
-      {recs.length > 0 && (
-        <div className="card p-5 space-y-4">
-          <div>
-            <div className="text-base font-bold text-text-primary">Keyingi qadamlar</div>
-            <div className="text-xs text-text-muted mt-0.5">Ushbu qo&apos;ng&apos;iroqdan keyin tavsiya etiladigan harakatlar</div>
-          </div>
+      <div className="card p-5 space-y-4">
+        <div>
+          <div className="text-base font-bold text-text-primary">Keyingi qadamlar</div>
+          <div className="text-xs text-text-muted mt-0.5">Ushbu qo&apos;ng&apos;iroqdan keyin tavsiya etiladigan harakatlar</div>
+        </div>
+        {recs.length > 0 ? (
           <ol className="space-y-3">
             {recs.map((rec, i) => (
               <li key={i} className="flex items-start gap-3 text-sm text-text-secondary">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-bg-elevated flex items-center justify-center text-xs font-bold text-text-primary">
                   {i + 1}
                 </span>
-                <span className="leading-relaxed">{rec.betterApproach}</span>
+                <div>
+                  {rec.problem && <p className="text-xs text-red-400 mb-1">{rec.problem}</p>}
+                  <p className="leading-relaxed">{rec.betterApproach}</p>
+                </div>
               </li>
             ))}
           </ol>
-        </div>
-      )}
+        ) : (
+          <div className="py-4 text-center text-sm text-text-muted">Tavsiyalar mavjud emas</div>
+        )}
+      </div>
 
       {/* ── Mezonlarga rioya qilishi ── */}
       {criteriaCompliance.length > 0 && (
@@ -357,17 +373,17 @@ export default async function CallDetailPage({ params }: { params: { id: string 
       )}
 
       {/* ── Aniqlangan xatoliklar va tavsiyalar ── */}
-      {problems.length > 0 && (
-        <div className="card p-5 space-y-4">
-          <div>
-            <div className="text-base font-bold text-text-primary">
-              Aniqlangan xatoliklar va tavsiyalar ({problems.length})
-            </div>
-            <div className="text-xs text-text-muted mt-0.5">
-              Quyidagi xatoliklar menejerning mezonlarga qanday rioya qilmaganini ko&apos;rsatadi.
-            </div>
+      <div className="card p-5 space-y-4">
+        <div>
+          <div className="text-base font-bold text-text-primary">
+            Aniqlangan xatoliklar va tavsiyalar ({problems.length})
           </div>
+          <div className="text-xs text-text-muted mt-0.5">
+            Quyidagi xatoliklar menejerning mezonlarga qanday rioya qilmaganini ko&apos;rsatadi.
+          </div>
+        </div>
 
+        {problems.length > 0 ? (
           <div className="space-y-2">
             {problems.map((p, i) => {
               const rec = recs[i]
@@ -375,7 +391,7 @@ export default async function CallDetailPage({ params }: { params: { id: string 
                 <details key={i} className="group border border-bg-border rounded-lg overflow-hidden">
                   <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none hover:bg-bg-elevated/60 transition-colors">
                     <span className="text-sm font-semibold text-text-primary">
-                      {p.split(' ').slice(0, 3).join(' ')}{' '}
+                      {p.split(' ').slice(0, 4).join(' ')}{p.split(' ').length > 4 ? '…' : ''}{' '}
                       <span className="text-text-muted font-normal">(1)</span>
                     </span>
                     <span className="text-xs text-brand-orange font-semibold group-open:hidden">Ko&apos;rish</span>
@@ -394,8 +410,10 @@ export default async function CallDetailPage({ params }: { params: { id: string 
               )
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="py-4 text-center text-sm text-text-muted">Xatoliklar aniqlanmagan</div>
+        )}
+      </div>
 
       {/* ── Nutq nisbati ── */}
       <div className="card p-5 space-y-4">
