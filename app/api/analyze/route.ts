@@ -101,11 +101,14 @@ export async function POST(request: NextRequest) {
 
     // Check daily audio limit for this project
     const managerProjectId = manager.projectId
+    let projectAiModel: string | undefined = undefined
     if (managerProjectId) {
       const project = await prisma.project.findUnique({
         where: { id: managerProjectId },
         select: { dailyLimitMinutes: true, features: true },
       }).catch(() => null)
+
+      projectAiModel = project ? ((project.features as Record<string, unknown>)?.aiModel as string | undefined) : undefined
 
       if (project) {
         // Check if aiAnalysis feature is enabled
@@ -173,6 +176,13 @@ export async function POST(request: NextRequest) {
     if (callCategories.length > 0) {
       const catList = callCategories.map(c => `- ${c.name}${c.description ? ': ' + c.description : ''}`).join('\n')
       extraContext += `\n\nMavjud suhbat kategoriyalari (callOutcome emas, suhbat turi):\n${catList}\n\nJSON javobida "callCategory" maydonini ham qo'sh — qaysi kategoriya ekanligini aniqlash uchun kategoriya nomini yoz (mavjud bo'lmasa null).`
+
+      // Build criteria scoring prompt for detected category or first category
+      const allCriteria = callCategories.flatMap(cat => cat.criteria.map(c => ({ catName: cat.name, critName: c.name, desc: c.description })))
+      if (allCriteria.length > 0) {
+        const critList = allCriteria.map((c, i) => `${i + 1}. [${c.catName}] ${c.critName}${c.desc ? ': ' + c.desc : ''}`).join('\n')
+        extraContext += `\n\nMEZONLAR RO'YXATI (har birini 0-100 ball bilan baholang):\n${critList}\n\nJSON javobida "criteriaScores" maydonini qo'shing:\n"criteriaScores": [{"name": "mezon nomi", "score": 85, "comment": "qisqacha izoh"}]\nHar bir mezonni qo'ng'iroq mazmuniga qarab baholang.`
+      }
     }
     if (leadCategories.length > 0) {
       const leadCatLines = leadCategories.map(cat => {
@@ -188,7 +198,8 @@ export async function POST(request: NextRequest) {
         analysisResult = await analyzeCallTranscription(
           transcription,
           manager.name,
-          extraContext || undefined
+          extraContext || undefined,
+          projectAiModel
         )
       } catch (err) {
         console.error('Analysis error:', err)
@@ -252,6 +263,7 @@ export async function POST(request: NextRequest) {
         callOutcome: analysisResult?.callOutcome || null,
         summary: analysisResult?.summary || null,
         leadQuality: leadQualityValue || null,
+        criteriaScores: analysisResult?.criteriaScores ? JSON.stringify(analysisResult.criteriaScores) : null,
         categoryId,
         status: 'analyzed',
         analyzedAt: new Date(),

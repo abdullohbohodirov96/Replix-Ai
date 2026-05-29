@@ -2,8 +2,14 @@
 
 import { prisma } from '@/lib/prisma'
 
-function getWebhookUrl(): string {
-  return process.env.BITRIX24_WEBHOOK_URL || ''
+async function getWebhookUrl(): Promise<string> {
+  try {
+    const integration = await prisma.integration.findUnique({ where: { name: 'bitrix24' } })
+    const cfg = integration?.config as Record<string, string> | null
+    return cfg?.webhook_url || process.env.BITRIX24_WEBHOOK_URL || ''
+  } catch {
+    return process.env.BITRIX24_WEBHOOK_URL || ''
+  }
 }
 
 type BitrixParams = Record<string, string | number | boolean | undefined>
@@ -13,7 +19,7 @@ export async function callMethod(
   params: BitrixParams = {}
 ): Promise<unknown> {
   try {
-    const webhookUrl = getWebhookUrl()
+    const webhookUrl = await getWebhookUrl()
     if (!webhookUrl) throw new Error('BITRIX24_WEBHOOK_URL sozlanmagan')
 
     const url = `${webhookUrl.replace(/\/$/, '')}/${method}.json`
@@ -140,7 +146,7 @@ export async function syncCallToBitrix(
   managerName: string
 ): Promise<boolean> {
   try {
-    const webhookUrl = getWebhookUrl()
+    const webhookUrl = await getWebhookUrl()
     if (!webhookUrl) return false
 
     const date = new Date(call.createdAt).toLocaleDateString('uz-UZ')

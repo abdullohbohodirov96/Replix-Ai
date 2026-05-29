@@ -18,8 +18,14 @@ interface AmoLead {
   name: string
 }
 
-function getBaseUrl(): string {
-  return process.env.AMOCRM_BASE_URL || ''
+async function getBaseUrl(): Promise<string> {
+  try {
+    const integration = await prisma.integration.findUnique({ where: { name: 'amocrm' } })
+    const cfg = integration?.config as Record<string, string> | null
+    return cfg?.base_url || process.env.AMOCRM_BASE_URL || ''
+  } catch {
+    return process.env.AMOCRM_BASE_URL || ''
+  }
 }
 
 async function getStoredTokens(): Promise<AmoTokens | null> {
@@ -63,7 +69,7 @@ export async function getAccessToken(): Promise<string> {
     const refreshToken = stored?.refresh_token || process.env.AMOCRM_REFRESH_TOKEN || ''
     if (!refreshToken) return process.env.AMOCRM_ACCESS_TOKEN || ''
 
-    const baseUrl = getBaseUrl()
+    const baseUrl = await getBaseUrl()
     if (!baseUrl) return stored?.access_token || process.env.AMOCRM_ACCESS_TOKEN || ''
 
     const res = await fetch(`${baseUrl}/oauth2/access_token`, {
@@ -223,7 +229,7 @@ export async function syncCallToAmo(
   managerName: string
 ): Promise<boolean> {
   try {
-    const baseUrl = getBaseUrl()
+    const baseUrl = await getBaseUrl()
     if (!baseUrl) return false
 
     const contactName = `Mijoz (${managerName}) — ${new Date(call.createdAt).toLocaleDateString('uz-UZ')}`

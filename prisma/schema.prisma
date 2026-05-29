@@ -76,6 +76,7 @@ model Call {
   callOutcome     String?
   summary         String?
   leadQuality     String?
+  criteriaScores  String?       // ALTER TABLE "Call" ADD COLUMN IF NOT EXISTS "criteriaScores" TEXT;
   status          String        @default("analyzed")
   categoryId      String?
   category        CallCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)

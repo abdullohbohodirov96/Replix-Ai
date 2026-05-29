@@ -85,6 +85,301 @@ const PlusIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
 )
 
+function IntegrationsTab({ integrations }: { integrations: Integration[] }) {
+  const intgMap: Record<string, Integration> = {}
+  for (const i of integrations) intgMap[i.name] = i
+
+  const [telegramTest, setTelegramTest] = useState<{ success?: boolean; message?: string } | null>(null)
+  const [telegramTesting, setTelegramTesting] = useState(false)
+
+  const [amoCfg, setAmoCfg] = useState<Record<string, string>>({
+    base_url: (intgMap.amocrm?.config as Record<string, string>)?.base_url || '',
+    client_id: (intgMap.amocrm?.config as Record<string, string>)?.client_id || '',
+    client_secret: '',
+    access_token: '',
+    refresh_token: '',
+  })
+  const [amoSaving, setAmoSaving] = useState(false)
+  const [amoMsg, setAmoMsg] = useState<{ success?: boolean; message?: string } | null>(null)
+
+  const [bitrixUrl, setBitrixUrl] = useState<string>((intgMap.bitrix24?.config as Record<string, string>)?.webhook_url || '')
+  const [bitrixSaving, setBitrixSaving] = useState(false)
+  const [bitrixMsg, setBitrixMsg] = useState<{ success?: boolean; message?: string } | null>(null)
+
+  const [mzSecret, setMzSecret] = useState<string>('')
+  const [mzSaving, setMzSaving] = useState(false)
+  const [mzMsg, setMzMsg] = useState('')
+
+  const webhookBase = typeof window !== 'undefined' ? window.location.origin : ''
+
+  const testIntegration = async (name: string, setter: (v: { success?: boolean; message?: string } | null) => void, loadSetter: (v: boolean) => void) => {
+    loadSetter(true)
+    setter(null)
+    try {
+      const res = await fetch(`/api/integrations/test?name=${name}`)
+      const data = await res.json() as { success?: boolean; message?: string }
+      setter(data)
+    } catch {
+      setter({ success: false, message: 'Tarmoq xatosi' })
+    } finally { loadSetter(false) }
+  }
+
+  const saveIntegration = async (name: string, config: Record<string, unknown>, enabled: boolean, onMsg: (v: { success?: boolean; message?: string } | null) => void, setSaving: (v: boolean) => void) => {
+    setSaving(true)
+    onMsg(null)
+    try {
+      const res = await fetch('/api/integrations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, enabled, config }),
+      })
+      const data = await res.json() as { success?: boolean; error?: string }
+      if (data.success) onMsg({ success: true, message: 'Saqlandi!' })
+      else onMsg({ success: false, message: data.error || 'Xato' })
+    } catch {
+      onMsg({ success: false, message: 'Tarmoq xatosi' })
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="max-w-2xl space-y-4">
+
+      {/* Telegram */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#2AABEE]/10 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#2AABEE"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-text-primary">Telegram Bot</div>
+              <div className="text-xs text-text-muted">Qo&apos;ng&apos;iroq tahlillarini Telegram kanaliga yuborish</div>
+            </div>
+          </div>
+          <span className={`badge ${intgMap.telegram?.enabled ? 'badge-success' : 'badge-neutral'}`}>
+            {intgMap.telegram?.enabled ? 'Faol' : 'Nofaol'}
+          </span>
+        </div>
+        <div className="bg-bg-elevated rounded-lg p-3 text-xs text-text-muted mb-3">
+          <div className="font-semibold text-text-secondary mb-1">Sozlash uchun:</div>
+          <div>1. <code className="bg-bg-card px-1 rounded">TELEGRAM_BOT_TOKEN</code> env o&apos;zgaruvchisini kiriting</div>
+          <div>2. <code className="bg-bg-card px-1 rounded">TELEGRAM_CHAT_ID</code> chat ID ni kiriting</div>
+          {intgMap.telegram?.lastSync && <div className="mt-1.5 text-text-dim">Oxirgi yuborish: {new Date(intgMap.telegram.lastSync).toLocaleString('uz-UZ')}</div>}
+        </div>
+        <button
+          onClick={() => testIntegration('telegram', setTelegramTest, setTelegramTesting)}
+          disabled={telegramTesting}
+          className="btn-secondary text-xs px-3 py-1.5"
+        >
+          {telegramTesting ? 'Tekshirilmoqda...' : 'Ulanishni tekshirish'}
+        </button>
+        {telegramTest && (
+          <div className={`mt-2 text-xs px-3 py-2 rounded-lg ${telegramTest.success ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+            {telegramTest.message}
+          </div>
+        )}
+      </div>
+
+      {/* AmoCRM */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#FF6F43]/10 flex items-center justify-center">
+              <span className="text-[#FF6F43] text-xs font-bold">Amo</span>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-text-primary">AmoCRM</div>
+              <div className="text-xs text-text-muted">Qo&apos;ng&apos;iroqlarni AmoCRM lídlariga sinxronlashtirish</div>
+            </div>
+          </div>
+          <span className={`badge ${intgMap.amocrm?.enabled ? 'badge-success' : 'badge-neutral'}`}>
+            {intgMap.amocrm?.enabled ? 'Faol' : 'Nofaol'}
+          </span>
+        </div>
+        <div className="space-y-2.5 mb-3">
+          <div>
+            <label className="text-xs text-text-muted mb-1 block">Base URL</label>
+            <input type="url" placeholder="https://kompaniya.amocrm.ru" value={amoCfg.base_url}
+              onChange={e => setAmoCfg(p => ({ ...p, base_url: e.target.value }))}
+              className="input-field text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-text-muted mb-1 block">Client ID</label>
+            <input type="text" placeholder="Integration Client ID" value={amoCfg.client_id}
+              onChange={e => setAmoCfg(p => ({ ...p, client_id: e.target.value }))}
+              className="input-field text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-text-muted mb-1 block">Client Secret</label>
+            <input type="password" placeholder="Client Secret (o'zgarmasa bo'sh qoldiring)" value={amoCfg.client_secret}
+              onChange={e => setAmoCfg(p => ({ ...p, client_secret: e.target.value }))}
+              className="input-field text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-text-muted mb-1 block">Access Token</label>
+            <input type="password" placeholder="Access Token" value={amoCfg.access_token}
+              onChange={e => setAmoCfg(p => ({ ...p, access_token: e.target.value }))}
+              className="input-field text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-text-muted mb-1 block">Refresh Token</label>
+            <input type="password" placeholder="Refresh Token" value={amoCfg.refresh_token}
+              onChange={e => setAmoCfg(p => ({ ...p, refresh_token: e.target.value }))}
+              className="input-field text-sm" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const cfg: Record<string, string> = { base_url: amoCfg.base_url, client_id: amoCfg.client_id }
+              if (amoCfg.client_secret) cfg.client_secret = amoCfg.client_secret
+              if (amoCfg.access_token) cfg.access_token = amoCfg.access_token
+              if (amoCfg.refresh_token) cfg.refresh_token = amoCfg.refresh_token
+              saveIntegration('amocrm', cfg, true, setAmoMsg, setAmoSaving)
+            }}
+            disabled={amoSaving || !amoCfg.base_url}
+            className="btn-primary text-xs px-3 py-1.5"
+          >
+            {amoSaving ? 'Saqlanmoqda...' : 'Saqlash'}
+          </button>
+          <button
+            onClick={() => testIntegration('amocrm', setAmoMsg, setAmoSaving)}
+            disabled={amoSaving}
+            className="btn-secondary text-xs px-3 py-1.5"
+          >
+            Ulanishni tekshirish
+          </button>
+        </div>
+        {amoMsg && (
+          <div className={`mt-2 text-xs px-3 py-2 rounded-lg ${amoMsg.success ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+            {amoMsg.message}
+          </div>
+        )}
+      </div>
+
+      {/* Bitrix24 */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#2FC7F7]/10 flex items-center justify-center">
+              <span className="text-[#2FC7F7] text-xs font-bold">B24</span>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-text-primary">Bitrix24</div>
+              <div className="text-xs text-text-muted">Bitrix24 CRM ga qo&apos;ng&apos;iroqlarni yuborish</div>
+            </div>
+          </div>
+          <span className={`badge ${intgMap.bitrix24?.enabled ? 'badge-success' : 'badge-neutral'}`}>
+            {intgMap.bitrix24?.enabled ? 'Faol' : 'Nofaol'}
+          </span>
+        </div>
+        <div className="mb-3">
+          <label className="text-xs text-text-muted mb-1 block">Webhook URL</label>
+          <input type="url" placeholder="https://domain.bitrix24.ru/rest/1/xxx/" value={bitrixUrl}
+            onChange={e => setBitrixUrl(e.target.value)}
+            className="input-field text-sm" />
+          <div className="text-xs text-text-dim mt-1">Bitrix24 → CRM → Sozlamalar → REST API dan webhook URL oling</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => saveIntegration('bitrix24', { webhook_url: bitrixUrl }, true, setBitrixMsg, setBitrixSaving)}
+            disabled={bitrixSaving || !bitrixUrl}
+            className="btn-primary text-xs px-3 py-1.5"
+          >
+            {bitrixSaving ? 'Saqlanmoqda...' : 'Saqlash'}
+          </button>
+          <button
+            onClick={() => testIntegration('bitrix24', setBitrixMsg, setBitrixSaving)}
+            disabled={bitrixSaving}
+            className="btn-secondary text-xs px-3 py-1.5"
+          >
+            Ulanishni tekshirish
+          </button>
+        </div>
+        {bitrixMsg && (
+          <div className={`mt-2 text-xs px-3 py-2 rounded-lg ${bitrixMsg.success ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+            {bitrixMsg.message}
+          </div>
+        )}
+      </div>
+
+      {/* Moi Zvanki */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#8B5CF6]/10 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-text-primary">Moi Zvanki (МойЗвонки)</div>
+              <div className="text-xs text-text-muted">Avtomatik qo&apos;ng&apos;iroq yozuvlarini olish va tahlil qilish</div>
+            </div>
+          </div>
+          <span className={`badge ${intgMap.moizvonki?.enabled ? 'badge-success' : 'badge-neutral'}`}>
+            {intgMap.moizvonki?.enabled ? 'Faol' : 'Nofaol'}
+          </span>
+        </div>
+
+        <div className="bg-bg-elevated rounded-lg p-3 mb-3">
+          <div className="text-xs font-semibold text-text-secondary mb-1.5">Webhook URL:</div>
+          <div className="flex items-center gap-2">
+            <code className="text-xs text-[#FF6B35] bg-bg-card px-2 py-1 rounded flex-1 break-all">
+              {webhookBase}/api/webhooks/moizvonki
+            </code>
+            <button
+              onClick={() => navigator.clipboard.writeText(`${webhookBase}/api/webhooks/moizvonki`)}
+              className="btn-secondary text-xs px-2 py-1 flex-shrink-0"
+              title="Nusxalash"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+          </div>
+          <div className="text-xs text-text-dim mt-1.5">Bu URL ni Moi Zvanki sozlamalarida webhook sifatida kiriting</div>
+        </div>
+
+        <div className="mb-3">
+          <label className="text-xs text-text-muted mb-1 block">Webhook Secret (ixtiyoriy)</label>
+          <input type="password" placeholder="Maxfiy kalit (ixtiyoriy)" value={mzSecret}
+            onChange={e => setMzSecret(e.target.value)}
+            className="input-field text-sm" />
+          <div className="text-xs text-text-dim mt-1">Moi Zvanki webhook secret kalit bilan bir xil bo&apos;lishi kerak</div>
+        </div>
+        <button
+          onClick={async () => {
+            setMzSaving(true)
+            setMzMsg('')
+            try {
+              const cfg: Record<string, unknown> = { enabled: true }
+              if (mzSecret) cfg.secret = mzSecret
+              const res = await fetch('/api/integrations', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: 'moizvonki', enabled: true, config: cfg }),
+              })
+              const data = await res.json() as { success?: boolean; error?: string }
+              setMzMsg(data.success ? 'Saqlandi!' : (data.error || 'Xato'))
+            } catch { setMzMsg('Tarmoq xatosi') }
+            finally { setMzSaving(false) }
+          }}
+          disabled={mzSaving}
+          className="btn-primary text-xs px-3 py-1.5"
+        >
+          {mzSaving ? 'Saqlanmoqda...' : 'Saqlash'}
+        </button>
+        {mzMsg && (
+          <div className={`mt-2 text-xs px-3 py-2 rounded-lg ${mzMsg === 'Saqlandi!' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+            {mzMsg}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function ProfileClient({ user, company, callCategories: initCallCats, leadCategories: initLeadCats, managers: initManagers, integrations, isAdmin, isSuperAdmin, managerCount, allProjects = [] }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -160,7 +455,7 @@ export default function ProfileClient({ user, company, callCategories: initCallC
   const [limitMaxMgr, setLimitMaxMgr] = useState(10)
   const [limitMaxAdm, setLimitMaxAdm] = useState(3)
   const [limitDaily, setLimitDaily] = useState(120)
-  const [editFeatures, setEditFeatures] = useState<Record<string, boolean>>({})
+  const [editFeatures, setEditFeatures] = useState<Record<string, unknown>>({})
   const [limitSaving, setLimitSaving] = useState(false)
   const [featSaving, setFeatSaving] = useState(false)
   const [localAdmins, setLocalAdmins] = useState<{ id: string; name: string; email: string; createdAt: string }[]>([])
@@ -801,6 +1096,22 @@ export default function ProfileClient({ user, company, callCategories: initCallC
                 {/* Tab: Funksiyalar */}
                 {companyTab === 'features' && (
                   <div className="card p-5">
+                    {/* AI Model selection */}
+                    <div className="mb-5 pb-5 border-b border-bg-border">
+                      <label className="text-xs font-semibold text-text-muted mb-2 block uppercase tracking-wider">AI Modeli</label>
+                      <select
+                        value={(editFeatures.aiModel as string) || 'gpt-4o'}
+                        onChange={e => setEditFeatures(prev => ({ ...prev, aiModel: e.target.value }))}
+                        className="input-field text-sm"
+                      >
+                        <option value="gpt-4o">GPT-4o (OpenAI) — tavsiya etiladi</option>
+                        <option value="gpt-4o-mini">GPT-4o Mini — tez, arzon</option>
+                        <option value="gpt-4">GPT-4 — kuchli</option>
+                        <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Groq) — bepul</option>
+                        <option value="llama-3.1-8b-instant">Llama 3.1 8B (Groq) — eng tez</option>
+                      </select>
+                      <div className="text-xs text-text-muted mt-1">Qo&apos;ng&apos;iroqlarni tahlil qiluvchi AI modeli</div>
+                    </div>
                     <div className="space-y-2.5 mb-4">
                       {[
                         { key: 'transcription', label: 'Transkripsiya', desc: "Audio matnini ko'rish" },
@@ -1299,26 +1610,7 @@ export default function ProfileClient({ user, company, callCategories: initCallC
 
       {/* ===== INTEGRATSIYALAR ===== */}
       {activeTab === 'integrations' && isAdmin && (
-        <div className="max-w-2xl space-y-3">
-          {integrations.length === 0 ? (
-            <div className="card p-8 text-center">
-              <div className="text-text-muted text-sm mb-2">Hali integratsiyalar sozlanmagan</div>
-              <p className="text-xs text-text-dim">CRM, telephony va boshqa xizmatlarni ulash uchun tez orada qo&apos;llab-quvvatlanadi</p>
-            </div>
-          ) : integrations.map(intg => (
-            <div key={intg.id} className="card p-4 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-bold text-text-primary">{intg.name}</div>
-                {intg.lastSync && <div className="text-xs text-text-muted mt-0.5">Oxirgi sinx: {new Date(intg.lastSync).toLocaleString('uz-UZ')}</div>}
-              </div>
-              <span className={`badge ${intg.enabled ? 'badge-success' : 'badge-neutral'}`}>{intg.enabled ? 'Faol' : 'Nofaol'}</span>
-            </div>
-          ))}
-          <div className="card p-4 border-dashed text-center cursor-pointer hover:bg-bg-elevated transition-colors">
-            <div className="text-sm text-text-muted font-semibold">+ Yangi integratsiya</div>
-            <p className="text-xs text-text-dim mt-1">Bitrix24, AmoCRM, Yclients va boshqalar</p>
-          </div>
-        </div>
+        <IntegrationsTab integrations={integrations} />
       )}
     </div>
   )

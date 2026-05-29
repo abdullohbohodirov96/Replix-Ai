@@ -91,12 +91,23 @@ export default async function CallDetailPage({ params }: { params: { id: string 
   const recs = parse<Rec[]>(call.recommendations, [])
   const displayScore = call.score ?? (call.rating ? Math.round(call.rating * 20) : null)
 
-  // Criteria compliance — use actual criteria from category
-  const criteriaCompliance = call.category?.criteria.map((c, i) => {
-    const base = displayScore ?? 60
-    const variation = ((i * 17 + 7) % 30) - 15
-    return { name: c.name, value: Math.min(100, Math.max(0, base + variation)) }
-  }) || []
+  // Parse real criteria scores from AI
+  type CriteriaScore = { name: string; score: number; comment: string }
+  let aiCriteriaScores: CriteriaScore[] = []
+  try {
+    if ((call as { criteriaScores?: string | null }).criteriaScores) {
+      aiCriteriaScores = JSON.parse((call as { criteriaScores?: string | null }).criteriaScores!)
+    }
+  } catch { /* ignore */ }
+
+  const criteriaCompliance = call.category?.criteria.map(c => {
+    const ai = aiCriteriaScores.find(s => s.name.toLowerCase().includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(s.name.toLowerCase()))
+    return {
+      name: c.name,
+      value: ai?.score ?? (displayScore ?? 60),
+      comment: ai?.comment ?? null,
+    }
+  }) || aiCriteriaScores.map(s => ({ name: s.name, value: s.score, comment: s.comment }))
 
   // Speech ratio
   let managerPct = 65, clientPct = 35
@@ -309,14 +320,20 @@ export default async function CallDetailPage({ params }: { params: { id: string 
 
           <div className="space-y-3">
             {criteriaCompliance.map(c => (
-              <div key={c.name} className="flex items-center gap-3">
-                <span className="text-xs text-text-secondary w-48 flex-shrink-0 text-right truncate" title={c.name}>{c.name}</span>
-                <div className="flex-1 h-5 bg-bg-elevated rounded overflow-hidden">
-                  <div
-                    className="h-full rounded transition-all"
-                    style={{ width: `${c.value}%`, background: criteriaColor(c.value) }}
-                  />
+              <div key={c.name}>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-text-secondary w-48 flex-shrink-0 text-right truncate" title={c.name}>{c.name}</span>
+                  <div className="flex-1 h-5 bg-bg-elevated rounded overflow-hidden">
+                    <div
+                      className="h-full rounded transition-all"
+                      style={{ width: `${c.value}%`, background: criteriaColor(c.value) }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold w-10 flex-shrink-0" style={{ color: criteriaColor(c.value) }}>{c.value}%</span>
                 </div>
+                {c.comment && (
+                  <div className="ml-52 mt-0.5 text-xs text-text-muted leading-relaxed pl-3">{c.comment}</div>
+                )}
               </div>
             ))}
             {/* Scale */}

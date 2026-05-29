@@ -24,7 +24,7 @@ function maskConfig(config: unknown): unknown {
   return masked
 }
 
-const INTEGRATION_NAMES = ['telegram', 'amocrm', 'bitrix24', 'google_sheets', 'instagram']
+const INTEGRATION_NAMES = ['telegram', 'amocrm', 'bitrix24', 'google_sheets', 'instagram', 'moizvonki']
 
 export async function GET() {
   try {
@@ -32,7 +32,7 @@ export async function GET() {
     if (!session) return NextResponse.json({ error: 'Tizimga kiring' }, { status: 401 })
 
     const sessionUser = session.user as { role?: string }
-    if (sessionUser.role !== 'admin') {
+    if (sessionUser.role !== 'admin' && sessionUser.role !== 'superadmin') {
       return NextResponse.json({ error: 'Admin huquqi kerak' }, { status: 403 })
     }
 
@@ -64,7 +64,7 @@ export async function PATCH(request: NextRequest) {
     if (!session) return NextResponse.json({ error: 'Tizimga kiring' }, { status: 401 })
 
     const sessionUser = session.user as { role?: string }
-    if (sessionUser.role !== 'admin') {
+    if (sessionUser.role !== 'admin' && sessionUser.role !== 'superadmin') {
       return NextResponse.json({ error: 'Admin huquqi kerak' }, { status: 403 })
     }
 
