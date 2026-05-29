@@ -51,12 +51,17 @@ export default async function ProfilePage() {
   // For superadmin: fetch all projects with per-project analytics
   let allProjects: any[] = []
   if (isSuperAdmin) {
-    const [projects, callStats] = await Promise.all([
+    const today = new Date().toISOString().split('T')[0]
+    const [projects, callStats, usageToday] = await Promise.all([
       prisma.project.findMany({
         include: {
           company: { select: { id: true, name: true, description: true } },
           _count: { select: { managers: true } },
-          users: { where: { role: { in: ['admin'] } }, select: { id: true } },
+          users: {
+            where: { role: { in: ['admin'] } },
+            select: { id: true, name: true, email: true, createdAt: true },
+            orderBy: { createdAt: 'desc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -69,19 +74,27 @@ export default async function ProfilePage() {
         WHERE m."projectId" IS NOT NULL
         GROUP BY m."projectId"
       `,
+      prisma.$queryRaw<{ projectId: string; minutes: number }[]>`
+        SELECT "projectId", minutes FROM "AudioUsage" WHERE date = ${today}
+      `.catch(() => [] as { projectId: string; minutes: number }[]),
     ])
 
     allProjects = projects.map(p => ({
       id: p.id,
       name: p.name,
       adminEmail: p.adminEmail,
-      adminPass: p.adminPass,
       createdAt: p.createdAt.toISOString(),
       company: p.company,
       managerCount: p._count.managers,
       adminCount: p.users.length,
+      admins: p.users.map((u: any) => ({ ...u, createdAt: u.createdAt.toISOString() })),
       totalCalls: Number(callStats.find((s: any) => s.projectId === p.id)?.total ?? 0),
       sales: Number(callStats.find((s: any) => s.projectId === p.id)?.sales ?? 0),
+      maxManagers: p.maxManagers,
+      maxAdmins: p.maxAdmins,
+      dailyLimitMinutes: p.dailyLimitMinutes,
+      features: (p.features ?? {}) as Record<string, boolean>,
+      todayUsageMinutes: usageToday.find((u: any) => u.projectId === p.id)?.minutes ?? 0,
     }))
   }
 

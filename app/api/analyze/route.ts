@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('audio') as File | null
     const managerId = formData.get('managerId') as string | null
+    const durationSeconds = parseInt(formData.get('durationSeconds') as string || '0', 10) || null
 
     if (!file) {
       return NextResponse.json({ error: 'Audio fayl topilmadi' }, { status: 400 })
@@ -95,6 +96,37 @@ export async function POST(request: NextRequest) {
     const manager = await prisma.manager.findUnique({ where: { id: managerId } })
     if (!manager) {
       return NextResponse.json({ error: 'Manager topilmadi' }, { status: 404 })
+    }
+
+    // Check daily audio limit for this project
+    const managerProjectId = manager.projectId
+    if (managerProjectId) {
+      const project = await prisma.project.findUnique({
+        where: { id: managerProjectId },
+        select: { dailyLimitMinutes: true, features: true },
+      }).catch(() => null)
+
+      if (project) {
+        // Check if aiAnalysis feature is enabled
+        const features = (project.features as Record<string, boolean>) || {}
+        if (features.aiAnalysis === false) {
+          return NextResponse.json({ error: "AI tahlil funksiyasi o'chirilgan" }, { status: 403 })
+        }
+
+        // Check daily limit
+        const today = new Date().toISOString().split('T')[0]
+        const usage = await prisma.$queryRaw<{ minutes: number }[]>`
+          SELECT COALESCE(minutes, 0) as minutes FROM "AudioUsage"
+          WHERE "projectId" = ${managerProjectId} AND date = ${today}
+          LIMIT 1
+        `.catch(() => [])
+        const usedMinutes = (usage[0]?.minutes ?? 0)
+        if (usedMinutes >= project.dailyLimitMinutes) {
+          return NextResponse.json({
+            error: `Kunlik audio limit to'ldi. ${project.dailyLimitMinutes} daqiqadan ${usedMinutes} daqiqa ishlatildi.`
+          }, { status: 429 })
+        }
+      }
     }
 
     const allowedTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/webm', 'audio/mp4']
@@ -188,6 +220,7 @@ export async function POST(request: NextRequest) {
         audioPath: filePath,
         audioData: buffer,
         audioMimeType: file.type || 'audio/mpeg',
+        duration: durationSeconds || undefined,
         transcription: transcription || null,
         analysis: analysisResult?.analysis || null,
         rating: analysisResult?.rating || null,
@@ -205,6 +238,17 @@ export async function POST(request: NextRequest) {
       },
       include: { manager: true },
     })
+
+    // Track audio usage for this project
+    if (managerProjectId && call.duration) {
+      const today = new Date().toISOString().split('T')[0]
+      const durationMinutes = Math.ceil(call.duration / 60)
+      await prisma.$executeRaw`
+        INSERT INTO "AudioUsage" (id, "projectId", date, minutes, "createdAt", "updatedAt")
+        VALUES (gen_random_uuid()::text, ${managerProjectId}, ${today}, ${durationMinutes}, NOW(), NOW())
+        ON CONFLICT ("projectId", date) DO UPDATE SET minutes = "AudioUsage".minutes + ${durationMinutes}, "updatedAt" = NOW()
+      `.catch(e => console.error('Usage tracking error:', e))
+    }
 
     // Fire-and-forget: extract AI knowledge and sync integrations
     if (transcription && analysisResult?.analysis) {

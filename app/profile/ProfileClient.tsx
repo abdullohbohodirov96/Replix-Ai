@@ -1,5 +1,5 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 type Criteria = { id: string; name: string; description: string | null; order: number; weight?: number }
@@ -11,13 +11,18 @@ type ProjectStats = {
   id: string
   name: string
   adminEmail: string | null
-  adminPass: string | null
   createdAt: string
   company: { id: string; name: string; description: string | null } | null
   managerCount: number
   adminCount: number
+  admins: { id: string; name: string; email: string; createdAt: string }[]
   totalCalls: number
   sales: number
+  maxManagers: number
+  maxAdmins: number
+  dailyLimitMinutes: number
+  features: Record<string, boolean>
+  todayUsageMinutes: number
 }
 
 interface Props {
@@ -149,6 +154,33 @@ export default function ProfileClient({ user, company, callCategories: initCallC
   const [projSaving, setProjSaving] = useState(false)
   const [projError, setProjError] = useState('')
   const selectedProject = allProjects.find(p => p.id === selectedProjectId) ?? null
+
+  // Company detail sub-tabs
+  const [companyTab, setCompanyTab] = useState<'stats' | 'limits' | 'features' | 'admins'>('stats')
+  const [limitMaxMgr, setLimitMaxMgr] = useState(10)
+  const [limitMaxAdm, setLimitMaxAdm] = useState(3)
+  const [limitDaily, setLimitDaily] = useState(120)
+  const [editFeatures, setEditFeatures] = useState<Record<string, boolean>>({})
+  const [limitSaving, setLimitSaving] = useState(false)
+  const [featSaving, setFeatSaving] = useState(false)
+  const [localAdmins, setLocalAdmins] = useState<{ id: string; name: string; email: string; createdAt: string }[]>([])
+  const [newAdminName, setNewAdminName] = useState('')
+  const [newAdminEmail, setNewAdminEmail] = useState('')
+  const [newAdminPass, setNewAdminPass] = useState('')
+  const [adminSaving, setAdminSaving] = useState(false)
+  const [adminError, setAdminError] = useState('')
+
+  useEffect(() => {
+    if (selectedProject) {
+      setLimitMaxMgr(selectedProject.maxManagers)
+      setLimitMaxAdm(selectedProject.maxAdmins)
+      setLimitDaily(selectedProject.dailyLimitMinutes)
+      setEditFeatures(selectedProject.features || {})
+      setLocalAdmins(selectedProject.admins || [])
+      setCompanyTab('stats')
+      setAdminError('')
+    }
+  }, [selectedProject?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- API helpers ---
   const saveProfile = async () => {
@@ -301,6 +333,57 @@ export default function ProfileClient({ user, company, callCategories: initCallC
     if (!confirm("Kompaniyani o'chirish? Barcha ma'lumotlar o'chadi.")) return
     if (selectedProjectId === id) setSelectedProjectId(allProjects.find(p => p.id !== id)?.id ?? null)
     await fetch(`/api/projects?id=${id}`, { method: 'DELETE' })
+    refresh()
+  }
+
+  const saveProjectLimits = async () => {
+    if (!selectedProject) return
+    setLimitSaving(true)
+    try {
+      await fetch('/api/projects/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedProject.id, maxManagers: limitMaxMgr, maxAdmins: limitMaxAdm, dailyLimitMinutes: limitDaily }),
+      })
+      refresh()
+    } finally { setLimitSaving(false) }
+  }
+
+  const saveProjectFeatures = async () => {
+    if (!selectedProject) return
+    setFeatSaving(true)
+    try {
+      await fetch('/api/projects/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedProject.id, features: editFeatures }),
+      })
+      refresh()
+    } finally { setFeatSaving(false) }
+  }
+
+  const addAdmin = async () => {
+    if (!selectedProject || !newAdminEmail || !newAdminPass) return
+    setAdminSaving(true); setAdminError('')
+    try {
+      const res = await fetch('/api/projects/admins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: selectedProject.id, name: newAdminName, email: newAdminEmail, password: newAdminPass }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setAdminError(data.error || 'Xatolik'); return }
+      const newAdmin = { ...data, createdAt: data.createdAt || new Date().toISOString() }
+      setLocalAdmins(prev => [newAdmin, ...prev])
+      setNewAdminName(''); setNewAdminEmail(''); setNewAdminPass('')
+      refresh()
+    } finally { setAdminSaving(false) }
+  }
+
+  const removeAdmin = async (adminId: string) => {
+    if (!confirm("Adminni o'chirish?")) return
+    setLocalAdmins(prev => prev.filter(a => a.id !== adminId))
+    await fetch(`/api/projects/admins?id=${adminId}`, { method: 'DELETE' })
     refresh()
   }
 
@@ -563,100 +646,234 @@ export default function ProfileClient({ user, company, callCategories: initCallC
               </div>
             ) : selectedProject ? (
               <div className="space-y-4">
-                {/* Header card */}
+                {/* Header */}
                 <div className="card p-5">
-                  <div className="flex items-start justify-between mb-5">
+                  <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 text-2xl font-bold"
+                      <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold flex-shrink-0"
                         style={{ background: '#f9731620', color: '#f97316', border: '2px solid #f9731630' }}>
                         {selectedProject.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="text-xl font-bold text-text-primary">{selectedProject.name}</div>
-                        <div className="text-sm text-text-muted mt-0.5">{selectedProject.adminEmail || 'Admin email yo\'q'}</div>
-                        <div className="text-xs text-text-dim mt-0.5">
-                          Yaratilgan: {new Date(selectedProject.createdAt).toLocaleDateString('uz-UZ')}
-                        </div>
+                        <div className="text-sm text-text-muted mt-0.5">{selectedProject.adminEmail || "Admin email yo'q"}</div>
+                        <div className="text-xs text-text-dim mt-0.5">Yaratilgan: {new Date(selectedProject.createdAt).toLocaleDateString('uz-UZ')}</div>
                       </div>
                     </div>
                     <button onClick={() => deleteProject(selectedProject.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#ef44441a] hover:bg-[#ef444430] text-[#ef4444] rounded-md border border-[#ef444430] transition-colors">
-                      <TrashIcon />
-                      O&apos;chirish
+                      <TrashIcon /> O&apos;chirish
                     </button>
                   </div>
-
-                  {/* Stats grid */}
-                  <div className="grid grid-cols-4 gap-3">
-                    <div className="rounded-lg p-4 text-center bg-bg-elevated">
-                      <div className="text-2xl font-bold text-text-primary">{selectedProject.managerCount}</div>
-                      <div className="text-xs text-text-muted mt-1">Menejerlar</div>
+                  {/* Stats row */}
+                  <div className="grid grid-cols-4 gap-2.5 mb-3">
+                    <div className="rounded-lg p-3 text-center bg-bg-elevated">
+                      <div className="text-xl font-bold text-text-primary">{selectedProject.managerCount}</div>
+                      <div className="text-xs text-text-dim mt-0.5">/ {selectedProject.maxManagers} menejer</div>
                     </div>
-                    <div className="rounded-lg p-4 text-center bg-bg-elevated">
-                      <div className="text-2xl font-bold text-text-primary">{selectedProject.adminCount}</div>
-                      <div className="text-xs text-text-muted mt-1">Adminlar</div>
+                    <div className="rounded-lg p-3 text-center bg-bg-elevated">
+                      <div className="text-xl font-bold text-text-primary">{selectedProject.adminCount}</div>
+                      <div className="text-xs text-text-dim mt-0.5">/ {selectedProject.maxAdmins} admin</div>
                     </div>
-                    <div className="rounded-lg p-4 text-center bg-bg-elevated">
-                      <div className="text-2xl font-bold text-[#3b82f6]">{selectedProject.totalCalls}</div>
-                      <div className="text-xs text-text-muted mt-1">Audio tahlillar</div>
+                    <div className="rounded-lg p-3 text-center bg-bg-elevated">
+                      <div className="text-xl font-bold text-[#3b82f6]">{selectedProject.totalCalls}</div>
+                      <div className="text-xs text-text-muted mt-0.5">tahlillar</div>
                     </div>
-                    <div className="rounded-lg p-4 text-center bg-bg-elevated">
-                      <div className="text-2xl font-bold text-[#22c55e]">{selectedProject.sales}</div>
-                      <div className="text-xs text-text-muted mt-1">Sotuvlar</div>
+                    <div className="rounded-lg p-3 text-center bg-bg-elevated">
+                      <div className="text-xl font-bold text-[#22c55e]">{selectedProject.sales}</div>
+                      <div className="text-xs text-text-muted mt-0.5">sotuvlar</div>
                     </div>
                   </div>
-
-                  {/* Conversion rate */}
-                  {selectedProject.totalCalls > 0 && (
-                    <div className="mt-3 p-3 rounded-lg bg-bg-elevated flex items-center justify-between">
-                      <span className="text-xs text-text-muted">Konversiya darajasi</span>
-                      <div className="flex items-center gap-3">
-                        <div className="w-40 h-2 bg-bg-base rounded-full overflow-hidden">
-                          <div className="h-full bg-[#22c55e] rounded-full"
-                            style={{ width: `${Math.round((selectedProject.sales / selectedProject.totalCalls) * 100)}%` }} />
-                        </div>
-                        <span className="text-sm font-bold text-[#22c55e]">
-                          {Math.round((selectedProject.sales / selectedProject.totalCalls) * 100)}%
-                        </span>
-                      </div>
+                  {/* Daily usage bar */}
+                  <div className="p-3 rounded-lg bg-bg-elevated">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="text-xs text-text-muted">Bugungi foydalanish</span>
+                      <span className="text-xs font-semibold text-brand-orange">
+                        {selectedProject.todayUsageMinutes} / {selectedProject.dailyLimitMinutes} daqiqa
+                        ({Math.floor(selectedProject.dailyLimitMinutes / 60)}s)
+                      </span>
                     </div>
-                  )}
+                    <div className="w-full h-2 bg-bg-base rounded-full overflow-hidden">
+                      <div className="h-full bg-brand-orange rounded-full transition-all"
+                        style={{ width: `${Math.min(100, Math.round((selectedProject.todayUsageMinutes / Math.max(1, selectedProject.dailyLimitMinutes)) * 100))}%` }} />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Company info */}
-                {selectedProject.company && (
-                  <div className="card p-5">
-                    <div className="section-title mb-3">Kompaniya haqida</div>
-                    {selectedProject.company.description ? (
-                      <p className="text-sm text-text-secondary leading-relaxed">{selectedProject.company.description}</p>
-                    ) : (
-                      <p className="text-sm text-text-muted italic">Ma&apos;lumot kiritilmagan</p>
+                {/* Sub-tabs */}
+                <div className="flex gap-1 border-b border-bg-border -mb-2">
+                  {(['stats', 'limits', 'features', 'admins'] as const).map(tab => {
+                    const labels = { stats: 'Statistika', limits: 'Limitlar', features: 'Funksiyalar', admins: 'Adminlar' }
+                    return (
+                      <button key={tab} onClick={() => setCompanyTab(tab)}
+                        className={`px-4 pb-2.5 pt-0.5 text-xs font-semibold border-b-2 transition-all ${
+                          companyTab === tab ? 'border-brand-orange text-text-primary' : 'border-transparent text-text-muted hover:text-text-primary'
+                        }`}>
+                        {labels[tab]}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Tab: Statistika */}
+                {companyTab === 'stats' && (
+                  <div className="card p-5 space-y-3">
+                    {selectedProject.totalCalls > 0 && (
+                      <div className="p-3 rounded-lg bg-bg-elevated flex items-center justify-between">
+                        <span className="text-xs text-text-muted">Konversiya darajasi</span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-40 h-2 bg-bg-base rounded-full overflow-hidden">
+                            <div className="h-full bg-[#22c55e] rounded-full"
+                              style={{ width: `${Math.round((selectedProject.sales / selectedProject.totalCalls) * 100)}%` }} />
+                          </div>
+                          <span className="text-sm font-bold text-[#22c55e]">{Math.round((selectedProject.sales / selectedProject.totalCalls) * 100)}%</span>
+                        </div>
+                      </div>
                     )}
+                    {selectedProject.company?.description && (
+                      <div>
+                        <div className="text-xs text-text-muted mb-1">Kompaniya haqida</div>
+                        <p className="text-sm text-text-secondary">{selectedProject.company.description}</p>
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between py-1.5 border-b border-bg-border">
+                        <span className="text-xs text-text-muted">Admin email</span>
+                        <span className="text-xs text-text-primary">{selectedProject.adminEmail || '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5 border-b border-bg-border">
+                        <span className="text-xs text-text-muted">Jami tahlillar</span>
+                        <span className="text-xs font-semibold text-text-primary">{selectedProject.totalCalls}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-xs text-text-muted">Muvaffaqiyatli sotuvlar</span>
+                        <span className="text-xs font-semibold text-[#22c55e]">{selectedProject.sales}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* Quick summary */}
-                <div className="card p-5">
-                  <div className="section-title mb-3">Tezkor ma&apos;lumot</div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between py-2 border-b border-bg-border">
-                      <span className="text-xs text-text-muted">Kompaniya ID</span>
-                      <span className="text-xs font-mono text-text-secondary">{selectedProject.id.slice(0, 16)}...</span>
+                {/* Tab: Limitlar */}
+                {companyTab === 'limits' && (
+                  <div className="card p-5 space-y-5">
+                    <div>
+                      <label className="text-xs font-semibold text-text-muted mb-2 block">Har kunlik audio limiti</label>
+                      <div className="flex items-center gap-3 mb-2">
+                        <input type="number" min={1} max={600} value={limitDaily}
+                          onChange={e => setLimitDaily(Math.max(1, Number(e.target.value)))}
+                          className="input-field w-24 text-center" />
+                        <span className="text-xs text-text-muted">daqiqa = {Math.floor(limitDaily / 60)}h {limitDaily % 60}min</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[30, 60, 120, 240, 480].map(m => (
+                          <button key={m} onClick={() => setLimitDaily(m)}
+                            className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
+                              limitDaily === m ? 'bg-brand-orange text-white border-brand-orange' : 'border-bg-border text-text-muted hover:bg-bg-elevated'
+                            }`}>
+                            {m < 60 ? `${m}min` : `${m / 60}s`}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between py-2 border-b border-bg-border">
-                      <span className="text-xs text-text-muted">Admin email</span>
-                      <span className="text-xs text-text-primary">{selectedProject.adminEmail || '—'}</span>
+                    <div>
+                      <label className="text-xs font-semibold text-text-muted mb-2 block">Maksimal menejerlar</label>
+                      <input type="number" min={1} max={500} value={limitMaxMgr}
+                        onChange={e => setLimitMaxMgr(Math.max(1, Number(e.target.value)))}
+                        className="input-field w-24 text-center" />
+                      <div className="text-xs text-text-dim mt-1">Hozir: {selectedProject.managerCount} ta menejer</div>
                     </div>
-                    <div className="flex items-center justify-between py-2 border-b border-bg-border">
-                      <span className="text-xs text-text-muted">Jami qo&apos;ng&apos;iroqlar</span>
-                      <span className="text-xs font-semibold text-text-primary">{selectedProject.totalCalls}</span>
+                    <div>
+                      <label className="text-xs font-semibold text-text-muted mb-2 block">Maksimal adminlar</label>
+                      <input type="number" min={1} max={50} value={limitMaxAdm}
+                        onChange={e => setLimitMaxAdm(Math.max(1, Number(e.target.value)))}
+                        className="input-field w-24 text-center" />
+                      <div className="text-xs text-text-dim mt-1">Hozir: {selectedProject.adminCount} ta admin</div>
                     </div>
-                    <div className="flex items-center justify-between py-2">
-                      <span className="text-xs text-text-muted">Muvaffaqiyatli sotuvlar</span>
-                      <span className="text-xs font-semibold text-[#22c55e]">{selectedProject.sales}</span>
+                    <button onClick={saveProjectLimits} disabled={limitSaving}
+                      className="px-5 py-2 text-sm font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md disabled:opacity-50 transition-colors">
+                      {limitSaving ? 'Saqlanmoqda...' : 'Saqlash'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Tab: Funksiyalar */}
+                {companyTab === 'features' && (
+                  <div className="card p-5">
+                    <div className="space-y-2.5 mb-4">
+                      {[
+                        { key: 'transcription', label: 'Transkripsiya', desc: "Audio matnini ko'rish" },
+                        { key: 'aiAnalysis', label: 'AI Tahlil', desc: 'Avtomatik AI suhbat tahlili' },
+                        { key: 'scoring', label: 'Ball tizimi', desc: 'Suhbat ballini hisoblash (0-100)' },
+                        { key: 'leadQuality', label: 'Lid sifati', desc: 'Lead sifatini baholash' },
+                        { key: 'reports', label: 'Hisobotlar', desc: 'Kunlik va oylik hisobotlar' },
+                        { key: 'criteria', label: 'Suhbat mezonlari', desc: "Maxsus mezonlarni boshqarish" },
+                        { key: 'dashboard', label: 'Dashboard', desc: 'Umumiy statistika sahifasi' },
+                      ].map(feat => {
+                        const enabled = editFeatures[feat.key] !== false
+                        return (
+                          <div key={feat.key} className="flex items-center justify-between p-3 rounded-lg bg-bg-elevated">
+                            <div>
+                              <div className="text-sm font-semibold text-text-primary">{feat.label}</div>
+                              <div className="text-xs text-text-muted">{feat.desc}</div>
+                            </div>
+                            <button
+                              onClick={() => setEditFeatures(prev => ({ ...prev, [feat.key]: !enabled }))}
+                              className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${enabled ? 'bg-brand-orange' : 'bg-bg-border'}`}
+                            >
+                              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <button onClick={saveProjectFeatures} disabled={featSaving}
+                      className="px-5 py-2 text-sm font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md disabled:opacity-50 transition-colors">
+                      {featSaving ? 'Saqlanmoqda...' : 'Saqlash'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Tab: Adminlar */}
+                {companyTab === 'admins' && (
+                  <div className="space-y-3">
+                    <div className="card p-4">
+                      {localAdmins.length === 0 ? (
+                        <div className="text-center py-4 text-xs text-text-muted">Adminlar yo&apos;q</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {localAdmins.map(admin => (
+                            <div key={admin.id} className="flex items-center justify-between p-2.5 rounded-lg bg-bg-elevated">
+                              <div>
+                                <div className="text-sm font-semibold text-text-primary">{admin.name}</div>
+                                <div className="text-xs text-text-muted">{admin.email}</div>
+                              </div>
+                              <button onClick={() => removeAdmin(admin.id)}
+                                className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                                <TrashIcon />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="card p-4">
+                      <div className="text-xs font-semibold text-text-secondary mb-3">+ Yangi admin qo&apos;shish</div>
+                      {adminError && <div className="mb-2 text-xs text-red-400">{adminError}</div>}
+                      <div className="space-y-2">
+                        <input value={newAdminName} onChange={e => setNewAdminName(e.target.value)}
+                          placeholder="Ism" className="input-field text-xs" />
+                        <input value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)}
+                          placeholder="Email *" type="email" className="input-field text-xs" />
+                        <input value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)}
+                          placeholder="Parol *" type="password" className="input-field text-xs" />
+                      </div>
+                      <button onClick={addAdmin} disabled={adminSaving || !newAdminEmail || !newAdminPass}
+                        className="mt-3 px-4 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md disabled:opacity-50 transition-colors">
+                        {adminSaving ? "Qo'shilmoqda..." : "Qo'shish"}
+                      </button>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center">
