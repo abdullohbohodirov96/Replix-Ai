@@ -6,6 +6,16 @@ import { useSession, signOut } from 'next-auth/react'
 
 const navItems = [
   {
+    href: '/ceo',
+    label: 'CEO Paneli',
+    superadminOnly: true,
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    ),
+  },
+  {
     href: '/dashboard',
     label: 'Dashboard',
     icon: (
@@ -68,17 +78,6 @@ const navItems = [
       </svg>
     ),
   },
-  {
-    href: '/superadmin/projects',
-    label: 'Projectlar',
-    superadminOnly: true,
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-      </svg>
-    ),
-  },
 ]
 
 export default function Sidebar() {
@@ -123,6 +122,11 @@ export default function Sidebar() {
               )}
               {item.icon}
               <span className="text-sm font-semibold">{item.label}</span>
+              {item.superadminOnly && (
+                <span className="ml-auto text-[9px] font-mono bg-brand-orange-dim text-brand-orange px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  CEO
+                </span>
+              )}
             </Link>
           )
         })}
