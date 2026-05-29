@@ -160,9 +160,10 @@ export async function POST(request: NextRequest) {
 
     // Fetch project-scoped company context + categories for enriched analysis
     const projectId = (session.user as { projectId?: string | null })?.projectId ?? null
-    const [company, callCategories] = await Promise.all([
+    const [company, callCategories, leadCategories] = await Promise.all([
       prisma.company.findFirst({ where: { projectId: projectId ?? undefined } }).catch(() => null),
       prisma.callCategory.findMany({ where: { projectId: projectId ?? undefined }, include: { criteria: { orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } }).catch(() => []),
+      prisma.leadCategory.findMany({ where: { projectId: projectId ?? undefined }, include: { criteria: { orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } }).catch(() => []),
     ])
 
     let extraContext = learnedContext || ''
@@ -172,6 +173,13 @@ export async function POST(request: NextRequest) {
     if (callCategories.length > 0) {
       const catList = callCategories.map(c => `- ${c.name}${c.description ? ': ' + c.description : ''}`).join('\n')
       extraContext += `\n\nMavjud suhbat kategoriyalari (callOutcome emas, suhbat turi):\n${catList}\n\nJSON javobida "callCategory" maydonini ham qo'sh — qaysi kategoriya ekanligini aniqlash uchun kategoriya nomini yoz (mavjud bo'lmasa null).`
+    }
+    if (leadCategories.length > 0) {
+      const leadCatLines = leadCategories.map(cat => {
+        const criteriaLines = cat.criteria.map((c, i) => `   ${i + 1}. ${c.description || c.name}`).join('\n')
+        return `- "${cat.label}" kategoriyasi mezonlari:\n${criteriaLines}`
+      }).join('\n')
+      extraContext += `\n\nLID SIFATINI ANIQLASH (MUHIM!):\nQuyidagi kategoriyalardan BITTA eng mos keluvchi kategoriyani tanlang va JSON javobiga "leadQuality" maydonini qo'shing. Har bir kategoriya mezonlarini qo'ng'iroq mazmuniga taqqoslab, BARCHA mezonlarni tekshiring va eng ko'p mos keluvchisini tanlang:\n\n${leadCatLines}\n\nJSON javobida: "leadQuality": "<kategoriya label nomi>" (mavjud bo'lmasa null)`
     }
 
     let analysisResult = null
@@ -187,20 +195,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Determine category from AI response
+    // Determine call category from AI response
     let categoryId: string | null = null
     if (analysisResult && callCategories.length > 0) {
-      try {
-        const raw = JSON.parse(analysisResult.analysis || '{}')
-        const catName = raw.callCategory as string | undefined
-        if (catName) {
-          const matched = callCategories.find(c =>
-            c.name.toLowerCase() === catName.toLowerCase() ||
-            catName.toLowerCase().includes(c.name.toLowerCase())
-          )
-          if (matched) categoryId = matched.id
-        }
-      } catch { /* ignore */ }
+      const aiCatName = analysisResult.callCategory
+      if (aiCatName) {
+        const matched = callCategories.find(c =>
+          c.name.toLowerCase() === aiCatName.toLowerCase() ||
+          aiCatName.toLowerCase().includes(c.name.toLowerCase())
+        )
+        if (matched) categoryId = matched.id
+      }
       // Fallback: keyword match on summary
       if (!categoryId && analysisResult.summary) {
         for (const cat of callCategories) {
@@ -210,6 +215,18 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+    }
+
+    // Determine lead quality from AI response
+    let leadQualityValue: string | null = null
+    if (analysisResult?.leadQuality && leadCategories.length > 0) {
+      const aiLabel = analysisResult.leadQuality.toLowerCase()
+      const matched = leadCategories.find(c =>
+        c.label.toLowerCase() === aiLabel ||
+        aiLabel.includes(c.label.toLowerCase()) ||
+        c.label.toLowerCase().includes(aiLabel)
+      )
+      leadQualityValue = matched?.label ?? analysisResult.leadQuality
     }
 
     const score = analysisResult?.rating ? Math.round(analysisResult.rating * 20) : null
@@ -234,6 +251,7 @@ export async function POST(request: NextRequest) {
         clientSentiment: analysisResult?.clientSentiment || null,
         callOutcome: analysisResult?.callOutcome || null,
         summary: analysisResult?.summary || null,
+        leadQuality: leadQualityValue || null,
         categoryId,
         status: 'analyzed',
         analyzedAt: new Date(),

@@ -245,13 +245,14 @@ export default function ProfileClient({ user, company, callCategories: initCallC
   }
 
   const addLeadCat = async () => {
-    if (!newLeadCatName.trim() || !newLeadCatLabel.trim()) return
+    if (!newLeadCatLabel.trim()) return
+    const autoName = newLeadCatLabel.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || `cat_${Date.now()}`
     const tempId = `temp_${Date.now()}`
-    const tempCat: LeadCategory = { id: tempId, name: newLeadCatName, label: newLeadCatLabel, description: null, color: newLeadCatColor, order: leadCats.length, criteria: [] }
+    const tempCat: LeadCategory = { id: tempId, name: autoName, label: newLeadCatLabel, description: null, color: newLeadCatColor, order: leadCats.length, criteria: [] }
     setLeadCats(prev => [...prev, tempCat])
     setSelectedLeadId(tempId)
-    setNewLeadCatName(''); setNewLeadCatLabel(''); setShowAddLeadCat(false)
-    const r = await fetch('/api/lead-categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newLeadCatName, label: newLeadCatLabel, color: newLeadCatColor }) })
+    setNewLeadCatLabel(''); setShowAddLeadCat(false)
+    const r = await fetch('/api/lead-categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: autoName, label: newLeadCatLabel, color: newLeadCatColor }) })
     const cat = await r.json()
     setLeadCats(prev => prev.map(c => c.id === tempId ? { ...c, id: cat.id } : c))
     setSelectedLeadId(cat.id)
@@ -267,12 +268,13 @@ export default function ProfileClient({ user, company, callCategories: initCallC
   }
 
   const addLeadCrit = async (leadCategoryId: string) => {
-    if (!newLeadCritName.trim()) return
+    const text = newLeadCritDesc.trim()
+    if (!text) return
     const tempId = `temp_${Date.now()}`
-    const tempCrit: Criteria = { id: tempId, name: newLeadCritName, description: newLeadCritDesc || null, order: selectedLeadCat?.criteria.length ?? 0 }
+    const tempCrit: Criteria = { id: tempId, name: text, description: text, order: selectedLeadCat?.criteria.length ?? 0 }
     setLeadCats(prev => prev.map(c => c.id === leadCategoryId ? { ...c, criteria: [...c.criteria, tempCrit] } : c))
-    setNewLeadCritName(''); setNewLeadCritDesc('')
-    const r = await fetch('/api/lead-criteria', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newLeadCritName, description: newLeadCritDesc || undefined, leadCategoryId }) })
+    setNewLeadCritDesc('')
+    const r = await fetch('/api/lead-criteria', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: text, description: text, leadCategoryId }) })
     const crit = await r.json()
     setLeadCats(prev => prev.map(c => c.id === leadCategoryId ? { ...c, criteria: c.criteria.map(cr => cr.id === tempId ? { ...cr, id: crit.id } : cr) } : c))
     refresh()
@@ -1060,48 +1062,69 @@ export default function ProfileClient({ user, company, callCategories: initCallC
             </button>
             {leadBannerOpen && (
               <div className="px-4 pb-4 text-xs text-text-muted leading-relaxed border-t border-[#1e3a5f] pt-3">
-                Har bir kategoriya mezonlariga ball beriladi: mos kelsa 1, mos kelmasa 0, noaniq bo&apos;lsa 0.5. Eng yuqori o&apos;rtacha ball bo&apos;lgan kategoriya tanlanadi.
+                Har bir kategoriya mezonlariga ball beriladi: mos kelsa 1, mos kelmasa 0, noaniq bo&apos;lsa 0.5. Eng yuqori o&apos;rtacha ball bo&apos;lgan kategoriya tanlanadi. AI tahlil qiluvchi qo&apos;ng&apos;iroqni shu mezonlarga taqqoslab lid sifatini aniqlaydi.
               </div>
             )}
           </div>
 
-          <div className="flex gap-4" style={{ minHeight: 'calc(100vh - 340px)' }}>
+          <div className="flex gap-5" style={{ minHeight: 'calc(100vh - 340px)' }}>
             {/* Left panel */}
             <div className="w-72 flex-shrink-0 flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-text-primary">Kategoriyalar</span>
                 <button onClick={() => setShowAddLeadCat(v => !v)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#3b82f6] hover:bg-[#2563eb] rounded-lg transition-colors">
                   <PlusIcon /> Yangi kategoriya
                 </button>
               </div>
 
               {showAddLeadCat && (
                 <div className="card p-3 space-y-2">
-                  <input value={newLeadCatLabel} onChange={e => setNewLeadCatLabel(e.target.value)} className="input-field" placeholder="Ko'rsatiladigan nom (Issiq lead)" />
-                  <input value={newLeadCatName} onChange={e => setNewLeadCatName(e.target.value)} className="input-field" placeholder="Identifikator (issiq)" />
-                  <div><div className="text-xs text-text-muted mb-1.5">Rang</div><ColorPicker value={newLeadCatColor} onChange={setNewLeadCatColor} /></div>
+                  <input
+                    value={newLeadCatLabel}
+                    onChange={e => setNewLeadCatLabel(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addLeadCat()}
+                    className="input-field"
+                    placeholder="Kategoriya nomi (masalan: Issiq lead)"
+                    autoFocus
+                  />
                   <div className="flex gap-2">
-                    <button onClick={addLeadCat} disabled={!newLeadCatName.trim() || !newLeadCatLabel.trim()} className="flex-1 py-1.5 text-xs font-semibold text-white bg-brand-orange rounded-md disabled:opacity-50">Qo&apos;shish</button>
-                    <button onClick={() => setShowAddLeadCat(false)} className="flex-1 py-1.5 text-xs text-text-muted border border-bg-border rounded-md hover:bg-bg-elevated">Bekor</button>
+                    <button onClick={addLeadCat} disabled={!newLeadCatLabel.trim()}
+                      className="flex-1 py-1.5 text-xs font-semibold text-white bg-[#3b82f6] hover:bg-[#2563eb] rounded-md disabled:opacity-50">
+                      Qo&apos;shish
+                    </button>
+                    <button onClick={() => { setShowAddLeadCat(false); setNewLeadCatLabel('') }}
+                      className="flex-1 py-1.5 text-xs text-text-muted border border-bg-border rounded-md hover:bg-bg-elevated">
+                      Bekor
+                    </button>
                   </div>
                 </div>
               )}
 
               <div className="flex-1 space-y-1.5">
-                {leadCats.length === 0 && <p className="text-xs text-text-muted text-center py-8">Hali kategoriyalar qo&apos;shilmagan</p>}
+                {leadCats.length === 0 && (
+                  <div className="text-center py-10">
+                    <div className="text-xs text-text-muted">Hali kategoriyalar qo&apos;shilmagan</div>
+                    <div className="text-xs text-text-dim mt-1">Masalan: Sovuq, Iliq, Issiq</div>
+                  </div>
+                )}
                 {leadCats.map((cat, idx) => (
                   <div key={cat.id} onClick={() => setSelectedLeadId(cat.id)}
-                    className={`group flex items-center gap-2 p-3 rounded-lg cursor-pointer border transition-all ${selectedLeadId === cat.id ? 'border-brand-orange bg-brand-orange-dim' : 'border-bg-border hover:bg-bg-elevated'}`}>
+                    className={`group flex items-center gap-2.5 p-3 rounded-lg cursor-pointer border transition-all ${
+                      selectedLeadId === cat.id
+                        ? 'border-[#3b82f6] bg-[#3b82f608] border-l-2'
+                        : 'border-bg-border hover:bg-bg-elevated'
+                    }`}>
                     <DragIcon />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-bold text-text-primary">{idx + 1}. {cat.label}</span>
-                        <span className="text-xs text-text-muted">({cat.criteria.length})</span>
-                      </div>
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                      <span className="text-sm font-semibold text-text-primary">{idx + 1}. {cat.label}</span>
+                      <span className="text-xs text-text-muted">({cat.criteria.length})</span>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={e => { e.stopPropagation(); deleteLeadCat(cat.id) }} className="p-1 text-text-muted hover:text-status-danger"><TrashIcon /></button>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button className="p-1.5 text-text-muted hover:text-[#3b82f6] rounded transition-colors"><EditIcon /></button>
+                      <span className="text-text-dim text-xs">|</span>
+                      <button onClick={e => { e.stopPropagation(); deleteLeadCat(cat.id) }}
+                        className="p-1.5 text-text-muted hover:text-status-danger rounded transition-colors"><TrashIcon /></button>
                     </div>
                   </div>
                 ))}
@@ -1115,43 +1138,67 @@ export default function ProfileClient({ user, company, callCategories: initCallC
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-text-primary">&laquo;{selectedLeadCat.label}&raquo; mezonlari</span>
                     <button onClick={() => { const el = document.getElementById('new-lead-crit-input'); el?.focus() }}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-brand-orange hover:bg-brand-orange-hover rounded-md transition-colors">
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#3b82f6] hover:bg-[#2563eb] rounded-lg transition-colors">
                       <PlusIcon /> Yangi mezon
                     </button>
                   </div>
 
-                  <div className="card p-3 flex gap-2">
-                    <div className="flex-1 space-y-2">
-                      <input id="new-lead-crit-input" value={newLeadCritName} onChange={e => setNewLeadCritName(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && addLeadCrit(selectedLeadCat.id)}
-                        className="input-field" placeholder="Mezon nomi..." />
-                      <input value={newLeadCritDesc} onChange={e => setNewLeadCritDesc(e.target.value)} className="input-field" placeholder="Tavsif..." />
-                    </div>
-                    <button onClick={() => addLeadCrit(selectedLeadCat.id)} disabled={!newLeadCritName.trim()}
-                      className="px-3 text-sm font-bold text-white bg-brand-orange rounded-md disabled:opacity-50 self-stretch">+</button>
+                  {/* Add criteria — description only */}
+                  <div className="card p-3 flex gap-2 items-start">
+                    <textarea
+                      id="new-lead-crit-input"
+                      value={newLeadCritDesc}
+                      onChange={e => setNewLeadCritDesc(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addLeadCrit(selectedLeadCat.id) } }}
+                      className="input-field flex-1 text-sm resize-none"
+                      rows={2}
+                      placeholder="Mezon tavsifi... (masalan: Mijoz mahsulotga qiziqish bildirdi va narxni so'radi)"
+                    />
+                    <button
+                      onClick={() => addLeadCrit(selectedLeadCat.id)}
+                      disabled={!newLeadCritDesc.trim()}
+                      className="px-4 py-2 text-sm font-bold text-white bg-[#3b82f6] hover:bg-[#2563eb] rounded-lg disabled:opacity-40 self-stretch transition-colors flex-shrink-0"
+                    >
+                      +
+                    </button>
                   </div>
 
+                  {/* Criteria list */}
                   <div className="space-y-2 overflow-y-auto flex-1">
-                    {selectedLeadCat.criteria.length === 0 && <p className="text-xs text-text-muted text-center py-10">Hali mezon qo&apos;shilmagan</p>}
+                    {selectedLeadCat.criteria.length === 0 && (
+                      <div className="text-center py-12 text-text-muted">
+                        <div className="text-xs">Hali mezon qo&apos;shilmagan</div>
+                        <div className="text-xs text-text-dim mt-1">Yuqoridagi maydonga mezon tavsifini yozing</div>
+                      </div>
+                    )}
                     {selectedLeadCat.criteria.map((c, i) => (
                       <div key={c.id} className="group card p-4 flex items-start gap-3">
                         <DragIcon />
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-text-primary mb-1">{i + 1}.</div>
-                          <div className="text-sm text-text-secondary">{c.name}</div>
-                          {c.description && <div className="text-xs text-text-muted mt-1">{c.description}</div>}
+                          <div className="text-xs font-bold text-text-muted mb-1">{i + 1}.</div>
+                          <div className="text-sm text-text-secondary leading-relaxed">
+                            {c.description || c.name}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                          <button className="p-1.5 text-text-muted hover:text-brand-orange rounded"><EditIcon /></button>
-                          <span className="text-text-dim">|</span>
-                          <button onClick={() => deleteLeadCrit(selectedLeadCat.id, c.id)} className="p-1.5 text-text-muted hover:text-status-danger rounded"><TrashIcon /></button>
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <button className="p-1.5 text-text-muted hover:text-[#3b82f6] rounded transition-colors"><EditIcon /></button>
+                          <span className="text-text-dim text-xs">|</span>
+                          <button onClick={() => deleteLeadCrit(selectedLeadCat.id, c.id)}
+                            className="p-1.5 text-text-muted hover:text-status-danger rounded transition-colors"><TrashIcon /></button>
                         </div>
                       </div>
                     ))}
                   </div>
                 </>
               ) : (
-                <div className="flex-1 flex items-center justify-center text-text-muted text-sm">Chap paneldan kategoriya tanlang</div>
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-muted opacity-40">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                  </svg>
+                  <div className="text-sm font-semibold text-text-muted">Kategoriya tanlang</div>
+                  <div className="text-xs text-text-dim">Chap paneldan kategoriya bosing</div>
+                </div>
               )}
             </div>
           </div>

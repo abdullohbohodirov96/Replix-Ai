@@ -37,6 +37,8 @@ export interface CallAnalysisResult {
   callOutcome: 'sale' | 'followup' | 'rejected' | 'unknown'
   analysis: string
   improvement: string
+  leadQuality: string | null
+  callCategory: string | null
 }
 
 export async function analyzeCallTranscription(
@@ -115,6 +117,8 @@ Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.${extraContext || ''}`
       callOutcome: r.callOutcome || 'unknown',
       analysis: r.analysis || '',
       improvement: r.improvement || '',
+      leadQuality: r.leadQuality || null,
+      callCategory: r.callCategory || null,
     }
   } catch {
     return {
@@ -127,6 +131,8 @@ Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.${extraContext || ''}`
       callOutcome: 'unknown',
       analysis: content,
       improvement: '',
+      leadQuality: null,
+      callCategory: null,
     }
   }
 }
