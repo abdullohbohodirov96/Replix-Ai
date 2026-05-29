@@ -72,11 +72,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Avval tizimga kiring' }, { status: 401 })
     }
     const sessionUser = session.user as { role?: string; managerId?: string | null }
-    const isAdmin = sessionUser.role === 'admin'
+    const isAdmin = sessionUser.role === 'admin' || sessionUser.role === 'superadmin'
 
     const formData = await request.formData()
     const file = formData.get('audio') as File | null
     const managerId = formData.get('managerId') as string | null
+    const clientPhone = (formData.get('clientPhone') as string | null) || null
     const durationSeconds = parseInt(formData.get('durationSeconds') as string || '0', 10) || null
 
     if (!file) {
@@ -221,6 +222,7 @@ export async function POST(request: NextRequest) {
         audioData: buffer,
         audioMimeType: file.type || 'audio/mpeg',
         duration: durationSeconds || undefined,
+        clientPhone: clientPhone || undefined,
         transcription: transcription || null,
         analysis: analysisResult?.analysis || null,
         rating: analysisResult?.rating || null,

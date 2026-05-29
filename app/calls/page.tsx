@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import UploadCallModal from '@/components/UploadCallModal'
 import CallsListClient from './CallsListClient'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -40,7 +41,17 @@ export default async function CallsPage() {
         calls={calls as any}
         managers={managers as any}
         isAdmin={isAdmin}
-        uploadModal={isAdmin ? <UploadCallModal managers={managers} /> : null}
+        uploadModal={isAdmin ? (
+          <Link
+            href="/calls/upload"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B35] hover:bg-[#FF5520] text-white text-sm font-display font-600 rounded-lg transition-colors shadow-lg shadow-orange-500/20"
+          >
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Audio Yuklash
+          </Link>
+        ) : null}
       />
     </div>
   )
