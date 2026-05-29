@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function DeleteCallButton({ callId }: { callId: string }) {
+export default function DeleteCallButton({ callId, redirectTo, label, variant }: { callId: string; redirectTo?: string; label?: string; variant?: 'danger' | 'icon' }) {
   const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -13,7 +13,8 @@ export default function DeleteCallButton({ callId }: { callId: string }) {
     try {
       const res = await fetch(`/api/calls/${callId}`, { method: 'DELETE' })
       if (res.ok) {
-        router.refresh()
+        if (redirectTo) router.push(redirectTo)
+        else router.refresh()
       }
     } finally {
       setLoading(false)
@@ -38,6 +39,15 @@ export default function DeleteCallButton({ callId }: { callId: string }) {
           Bekor
         </button>
       </div>
+    )
+  }
+
+  if (variant === 'danger') {
+    return (
+      <button onClick={() => setConfirming(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#ef44441a] hover:bg-[#ef444430] text-[#ef4444] rounded-md border border-[#ef444430] transition-colors">
+        {label || "O'chirish"}
+      </button>
     )
   }
 

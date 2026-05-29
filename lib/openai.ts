@@ -37,11 +37,16 @@ export interface CallAnalysisResult {
   callOutcome: 'sale' | 'followup' | 'rejected' | 'unknown'
   analysis: string
   improvement: string
+  leadQuality: string | null
+  callCategory: string | null
+  criteriaScores: Array<{ name: string; score: number; comment: string }> | null
 }
 
 export async function analyzeCallTranscription(
   transcription: string,
-  managerName: string
+  managerName: string,
+  extraContext?: string,
+  model?: string
 ): Promise<CallAnalysisResult> {
   const systemPrompt = `Sen Replix AI — professional savdo trenerisan. Dunyabunya savdo platformasi uchun ishlaysan.
 Sening vazifang — savdo qo'ng'iroqlarini chuqur tahlil qilib, managerga ANIQ va AMALIY maslahatlar berish.
@@ -79,10 +84,10 @@ Baholash mezonlari:
 4 - Yaxshi: professional, ehtiyojni aniqladi, kichik kamchiliklar
 5 - A'lo: mijozni tingladi, ehtiyojni aniqladi, e'tirozlar bilan ishladi, natijaga olib keldi
 
-Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.`
+Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.${extraContext || ''}`
 
   const response = await openai.chat.completions.create({
-    model: CHAT_MODEL,
+    model: model || CHAT_MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `Manager ismi: ${managerName}\n\nQo'ng'iroq transkripsiyasi:\n${transcription}\n\nYuqoridagi JSON formatida chuqur tahlil ber. Recommendations da har bir muammo uchun manager ANIQ nima deyishi kerakligini yoz.` },
@@ -114,6 +119,9 @@ Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.`
       callOutcome: r.callOutcome || 'unknown',
       analysis: r.analysis || '',
       improvement: r.improvement || '',
+      leadQuality: r.leadQuality || null,
+      callCategory: r.callCategory || null,
+      criteriaScores: Array.isArray(r.criteriaScores) ? r.criteriaScores.map((s: { name?: string; score?: number; comment?: string }) => ({ name: String(s.name || ''), score: Math.min(100, Math.max(0, Number(s.score || 0))), comment: String(s.comment || '') })) : null,
     }
   } catch {
     return {
@@ -126,6 +134,9 @@ Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.`
       callOutcome: 'unknown',
       analysis: content,
       improvement: '',
+      leadQuality: null,
+      callCategory: null,
+      criteriaScores: null,
     }
   }
 }

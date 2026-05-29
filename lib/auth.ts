@@ -18,24 +18,26 @@ export const authOptions: NextAuthOptions = {
         if (!user) return null
         const valid = await bcrypt.compare(credentials.password, user.password)
         if (!valid) return null
-        return { id: user.id, name: user.name, email: user.email, role: user.role, managerId: user.managerId ?? null }
+        return { id: user.id, name: user.name, email: user.email, role: user.role, managerId: user.managerId ?? null, projectId: user.projectId ?? null }
       },
     }),
   ],
   callbacks: {
     jwt({ token, user }) {
       if (user) {
-        const u = user as unknown as { role: string; managerId?: string | null }
+        const u = user as unknown as { role: string; managerId?: string | null; projectId?: string | null }
         token.role = u.role
         token.managerId = u.managerId ?? null
+        token.projectId = u.projectId ?? null
       }
       return token
     },
     session({ session, token }) {
       if (session.user) {
-        const u = session.user as { role?: string; managerId?: string | null; id?: string }
+        const u = session.user as { role?: string; managerId?: string | null; projectId?: string | null; id?: string }
         u.role = token.role as string
         u.managerId = token.managerId as string | null
+        u.projectId = token.projectId as string | null
         u.id = token.sub  // user id from JWT sub
       }
       return session
