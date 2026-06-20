@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Manager {
@@ -20,12 +19,18 @@ model Manager {
   calls       Call[]
   reports     DailyReport[]
   users       User[]
+  leads       Lead[]
 }
 
 model Call {
   id              String    @id @default(cuid())
   managerId       String
   manager         Manager   @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  leadId          String?
+  lead            Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  callType        String?   @default("sotuv") // sotuv, qayta_qongiroq, kiruvchi, chiquvchi
+  clientPhone     String?
+  moiZvonkiCallId String?   @unique
   audioFileName   String
   audioPath       String
   audioData       Bytes?
@@ -41,6 +46,9 @@ model Call {
   clientSentiment String?
   callOutcome     String?
   summary         String?
+  criteriaScores  String?   // JSON: {criteriaId: score}
+  leadScoreResult String?   // hot, warm, cold
+  tgNotified      Boolean   @default(false)
   createdAt       DateTime  @default(now())
   callDate        DateTime  @default(now())
 }
@@ -84,4 +92,82 @@ model SupportMessage {
   isRead     Boolean  @default(false)
   wantsAdmin Boolean  @default(false)
   createdAt  DateTime @default(now())
+}
+
+// Leadlar (Google Sheets bilan sinxronlashgan)
+model Lead {
+  id            String    @id @default(cuid())
+  name          String?
+  phone         String
+  source        String?   @default("sheets")
+  status        String    @default("yangi") // yangi, bog'lanildi, sotildi, rad_etildi
+  managerId     String?
+  manager       Manager?  @relation(fields: [managerId], references: [id], onDelete: SetNull)
+  sheetRowIndex Int?      // Google Sheets qator raqami
+  sheetId       String?   // Qaysi sheets
+  comment       String?   // Sheets dagi izoh
+  aiAnalysis    String?   // AI tahlili
+  aiRating      Float?    // AI bahosi (1-10)
+  leadScore     String?   // hot, warm, cold
+  lastCallDate  DateTime?
+  callCount     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  calls         Call[]
+}
+
+// Qo'ng'iroq tahlil mezonlari
+model AnalysisCriteria {
+  id          String   @id @default(cuid())
+  name        String   // Mezon nomi (e.g., "Kirish qismi", "Ehtiyojni aniqlash")
+  callType    String   // sotuv, qayta_qongiroq, kiruvchi, chiquvchi
+  description String   // Bu mezon nimani baholaydi
+  maxScore    Int      @default(10)
+  weight      Float    @default(1.0)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+// Lead baholash mezonlari
+model LeadScoringCriteria {
+  id          String   @id @default(cuid())
+  leadType    String   // hot, warm, cold
+  criteria    String   // JSON array of criteria strings
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+// Integratsiya sozlamalari
+model Integration {
+  id        String   @id @default(cuid())
+  type      String   @unique // moizvonki, google_sheets, telegram
+  config    String   // JSON: API keys, settings
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Telegram hisobotlar tarixi
+model TelegramReport {
+  id         String   @id @default(cuid())
+  type       String   // daily, call_analysis, lead_update
+  chatId     String
+  message    String
+  status     String   @default("sent") // sent, failed
+  metadata   String?  // JSON
+  createdAt  DateTime @default(now())
+}
+
+// Moi Zvonki webhook loglari
+model WebhookLog {
+  id          String   @id @default(cuid())
+  source      String   @default("moizvonki")
+  payload     String   // Raw JSON
+  status      String   @default("received") // received, processed, failed
+  callId      String?  // Agar Call yaratilsa
+  leadId      String?  // Agar Lead topilsa
+  errorMsg    String?
+  createdAt   DateTime @default(now())
 }

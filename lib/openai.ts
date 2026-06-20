@@ -130,6 +130,131 @@ Faqat to'g'ri JSON qaytaras, boshqa matn yo'q.`
   }
 }
 
+export interface CriteriaItem {
+  id: string
+  name: string
+  description: string
+  maxScore: number
+  weight: number
+}
+
+export interface CriteriaAnalysisResult extends CallAnalysisResult {
+  criteriaScores: Record<string, number>
+  totalCriteriaScore: number
+  leadScore: 'hot' | 'warm' | 'cold'
+}
+
+export async function analyzeCallWithCriteria(
+  transcription: string,
+  managerName: string,
+  callType: string,
+  criteria: CriteriaItem[],
+  leadScoringCriteria: { hot: string[]; warm: string[]; cold: string[] }
+): Promise<CriteriaAnalysisResult> {
+  const criteriaText = criteria
+    .map(
+      (c) =>
+        `- "${c.name}" (id: ${c.id}, maks ball: ${c.maxScore}): ${c.description}`
+    )
+    .join('\n')
+
+  const callTypeLabels: Record<string, string> = {
+    sotuv: 'Sotuv qo\'ng\'irog\'i',
+    qayta_qongiroq: 'Qayta qo\'ng\'iroq',
+    kiruvchi: 'Kiruvchi qo\'ng\'iroq',
+    chiquvchi: 'Chiquvchi qo\'ng\'iroq',
+  }
+
+  const systemPrompt = `Sen Replix AI — professional savdo trenerisan.
+Qo'ng'iroq turini e'tiborga olib, FAQAT berilgan mezonlar bo'yicha tahlil qilasan.
+Mezonlarni o'zing o'ylab topmaysan — faqat berilgan mezonlar bo'yicha baholaysan.
+
+Qo'ng'iroq turi: ${callTypeLabels[callType] || callType}
+
+BAHOLASH MEZONLARI:
+${criteriaText}
+
+LEAD TURLARI:
+Hot lead belgilari: ${leadScoringCriteria.hot.join(', ')}
+Warm lead belgilari: ${leadScoringCriteria.warm.join(', ')}
+Cold lead belgilari: ${leadScoringCriteria.cold.join(', ')}
+
+JSON formatida qaytaras:
+{
+  "summary": "Suhbat qisqacha mazmuni (2-3 jumla)",
+  "rating": 1.0-10.0 oralig'ida umumiy baho,
+  "criteriaScores": { "criteria_id": ball, ... },
+  "problems": ["aniq muammo 1", ...],
+  "positives": ["yaxshi narsa 1", ...],
+  "recommendations": [{"problem": "...", "betterApproach": "..."}],
+  "clientSentiment": "positive" | "negative" | "neutral",
+  "callOutcome": "sale" | "followup" | "rejected" | "unknown",
+  "analysis": "Batafsil tahlil (4-6 jumla)",
+  "improvement": "Keyingi qo'ng'iroq uchun maslahat",
+  "leadScore": "hot" | "warm" | "cold"
+}
+
+Faqat JSON, boshqa matn yo'q.`
+
+  const response = await openai.chat.completions.create({
+    model: CHAT_MODEL,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      {
+        role: 'user',
+        content: `Manager: ${managerName}\n\nTranskripsiya:\n${transcription}`,
+      },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
+    max_tokens: 2500,
+  })
+
+  const content = response.choices[0].message.content || '{}'
+  try {
+    const r = JSON.parse(content)
+    const criteriaScores: Record<string, number> = {}
+    if (r.criteriaScores && typeof r.criteriaScores === 'object') {
+      for (const [k, v] of Object.entries(r.criteriaScores)) {
+        criteriaScores[k] = Number(v)
+      }
+    }
+    const totalCriteriaScore =
+      Object.values(criteriaScores).reduce((a, b) => a + b, 0) / Math.max(criteria.length, 1)
+
+    const baseResult = await analyzeCallTranscription(transcription, managerName)
+
+    return {
+      ...baseResult,
+      summary: r.summary || baseResult.summary,
+      rating: Math.min(10, Math.max(1, parseFloat(String(r.rating || '5')))),
+      problems: Array.isArray(r.problems) ? r.problems.map(String) : baseResult.problems,
+      positives: Array.isArray(r.positives) ? r.positives.map(String) : baseResult.positives,
+      recommendations: Array.isArray(r.recommendations)
+        ? r.recommendations.map((x: { problem?: string; betterApproach?: string }) => ({
+            problem: String(x.problem || ''),
+            betterApproach: String(x.betterApproach || ''),
+          }))
+        : baseResult.recommendations,
+      clientSentiment: r.clientSentiment || baseResult.clientSentiment,
+      callOutcome: r.callOutcome || baseResult.callOutcome,
+      analysis: r.analysis || baseResult.analysis,
+      improvement: r.improvement || baseResult.improvement,
+      criteriaScores,
+      totalCriteriaScore,
+      leadScore: r.leadScore || 'warm',
+    }
+  } catch {
+    const baseResult = await analyzeCallTranscription(transcription, managerName)
+    return {
+      ...baseResult,
+      criteriaScores: {},
+      totalCriteriaScore: baseResult.rating * 2,
+      leadScore: 'warm',
+    }
+  }
+}
+
 export async function generateDailyReport(
   managerName: string,
   calls: Array<{ summary: string; rating: number; problems: string[]; callOutcome: string }>
@@ -153,4 +278,37 @@ export async function generateDailyReport(
   } catch {
     return { summary: 'Hisobot xatolik', topProblems: [], improvement: '' }
   }
+}
+
+export async function generateManagerWorkloadRecommendation(data: {
+  managerCount: number
+  totalLeadsToday: number
+  contactedLeadsToday: number
+  totalCallsToday: number
+  avgCallsPerManager: number
+  avgRating: number
+  uncontactedLeads: number
+}): Promise<string> {
+  const response = await openai.chat.completions.create({
+    model: CHAT_MODEL,
+    messages: [
+      {
+        role: 'user',
+        content: `Sen savdo bo'limi menejeri yordamchisisan. Bugungi statistika:
+- Managerlar soni: ${data.managerCount}
+- Sheetsga tushgan leadlar: ${data.totalLeadsToday}
+- Bog'lanilgan leadlar: ${data.contactedLeadsToday}
+- Jami qo'ng'iroqlar: ${data.totalCallsToday}
+- Manager boshiga o'rtacha qo'ng'iroq: ${data.avgCallsPerManager.toFixed(1)}
+- O'rtacha baho: ${data.avgRating.toFixed(1)}/10
+- Hali bog'lanilmagan leadlar: ${data.uncontactedLeads}
+
+Haqiqiy rahbar sifatida: managerlar band/bo'shmi, leadlarni ko'paytirish/kamaytirish kerakmi?
+Aniq tavsiya ber (2-3 jumla, o'zbekcha).`,
+      },
+    ],
+    temperature: 0.5,
+    max_tokens: 300,
+  })
+  return response.choices[0].message.content || 'Tavsiya mavjud emas'
 }
