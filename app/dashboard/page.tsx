@@ -6,40 +6,49 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 async function getDashboardStats() {
-  const [totalManagers, totalCalls, recentCalls, managers] = await Promise.all([
-    prisma.manager.count(),
-    prisma.call.count(),
-    prisma.call.findMany({
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true, callOutcome: true, rating: true, summary: true, createdAt: true,
-        manager: { select: { id: true, name: true } },
-      },
-    }),
-    prisma.manager.findMany({
-      include: {
-        calls: {
-          select: { rating: true, callOutcome: true },
+  try {
+    const [totalManagers, totalCalls, recentCalls, managers] = await Promise.all([
+      prisma.manager.count(),
+      prisma.call.count(),
+      prisma.call.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, callOutcome: true, rating: true, summary: true, createdAt: true,
+          manager: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.manager.findMany({
+        include: {
+          calls: {
+            select: { rating: true, callOutcome: true },
+          },
+        },
+        take: 5,
+      }),
+    ])
+
+    const avgRating = await prisma.call.aggregate({
+      _avg: { rating: true },
+    })
+
+    const todayCalls = await prisma.call.count({
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
         },
       },
-      take: 5,
-    }),
-  ])
+    })
 
-  const avgRating = await prisma.call.aggregate({
-    _avg: { rating: true },
-  })
-
-  const todayCalls = await prisma.call.count({
-    where: {
-      createdAt: {
-        gte: new Date(new Date().setHours(0, 0, 0, 0)),
-      },
-    },
-  })
-
-  return { totalManagers, totalCalls, recentCalls, avgRating, todayCalls, managers }
+    return { totalManagers, totalCalls, recentCalls, avgRating, todayCalls, managers, error: null }
+  } catch (e) {
+    console.error('Dashboard DB error:', e)
+    return {
+      totalManagers: 0, totalCalls: 0, recentCalls: [], managers: [],
+      avgRating: { _avg: { rating: null } }, todayCalls: 0,
+      error: 'Database ulanishida xato. Iltimos DATABASE_URL ni tekshiring.',
+    }
+  }
 }
 
 function StarRatingDisplay({ rating }: { rating: number | null }) {
@@ -84,8 +93,21 @@ function SentimentBadge({ sentiment }: { sentiment: string | null }) {
 }
 
 export default async function DashboardPage() {
-  const { totalManagers, totalCalls, recentCalls, avgRating, todayCalls, managers } =
+  const { totalManagers, totalCalls, recentCalls, avgRating, todayCalls, managers, error } =
     await getDashboardStats()
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto mt-20 text-center space-y-4">
+        <div className="text-5xl">⚠️</div>
+        <h1 className="text-2xl font-display font-700 text-white">Database xatosi</h1>
+        <p className="text-[#9494B8] font-mono text-sm">{error}</p>
+        <div className="mt-6 p-4 bg-[#0D0D1A] border border-red-500/30 rounded-xl text-left">
+          <p className="text-xs font-mono text-red-400">Render → Environment → DATABASE_URL ni tekshiring</p>
+        </div>
+      </div>
+    )
+  }
 
   const statCards = [
     {
