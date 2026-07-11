@@ -12,10 +12,16 @@ export const openai = new OpenAI(
 export const CHAT_MODEL = useGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o'
 const WHISPER_MODEL = useGroq ? 'whisper-large-v3' : 'whisper-1'
 
-export async function transcribeAudio(filePath: string): Promise<string> {
-  const audioFile = fs.createReadStream(filePath)
+export async function transcribeAudio(fileOrPath: File | string): Promise<string> {
+  let fileToUpload: any
+  if (typeof fileOrPath === 'string') {
+    fileToUpload = fs.createReadStream(fileOrPath)
+  } else {
+    fileToUpload = fileOrPath
+  }
+  
   const transcription = await openai.audio.transcriptions.create({
-    file: audioFile,
+    file: fileToUpload,
     model: WHISPER_MODEL,
     response_format: 'text',
   })

@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { unlink, writeFile, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import path from 'path'
 import { transcribeAudio, analyzeCallTranscription } from '@/lib/openai'
 
 export const dynamic = 'force-dynamic'
@@ -26,28 +23,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Audio fayl yuborilmadi' }, { status: 400 })
     }
 
-    // Save new audio file
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
-    }
-
-    const timestamp = Date.now()
-    const sanitizedName = audioFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const fileName = `${timestamp}_${sanitizedName}`
-    const filePath = path.join(uploadsDir, fileName)
-
     const arrayBuffer = await audioFile.arrayBuffer()
     const audioBuffer = Buffer.from(arrayBuffer)
-    await writeFile(filePath, audioBuffer)
-
-    // Delete old audio file
-    if (existingCall.audioPath && existsSync(existingCall.audioPath)) {
-      await unlink(existingCall.audioPath).catch(() => {})
-    }
 
     // Transcribe new audio
-    const transcription = await transcribeAudio(filePath)
+    const transcription = await transcribeAudio(audioFile)
 
     // Re-analyze
     const analysis = await analyzeCallTranscription(
@@ -60,7 +40,7 @@ export async function PATCH(
       where: { id: params.id },
       data: {
         audioFileName: audioFile.name,
-        audioPath: filePath,
+        audioPath: '', // Removed local filesystem dependency
         audioData: audioBuffer,
         audioMimeType: audioFile.type || 'audio/mpeg',
         transcription,
@@ -107,10 +87,6 @@ export async function DELETE(
     const call = await prisma.call.findUnique({ where: { id: params.id } })
     if (!call) {
       return NextResponse.json({ error: 'Qo\'ng\'iroq topilmadi' }, { status: 404 })
-    }
-
-    if (call.audioPath && existsSync(call.audioPath)) {
-      await unlink(call.audioPath).catch(() => {})
     }
 
     await prisma.call.delete({ where: { id: params.id } })

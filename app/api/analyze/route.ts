@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { transcribeAudio, analyzeCallTranscription } from '@/lib/openai'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
-import { existsSync } from 'fs'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-async function ensureUploadsDir() {
-  const uploadsDir = path.join(process.cwd(), 'uploads')
-  if (!existsSync(uploadsDir)) {
-    await mkdir(uploadsDir, { recursive: true })
-  }
-  return uploadsDir
-}
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,17 +50,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const uploadsDir = await ensureUploadsDir()
-    const uniqueFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-    const filePath = path.join(uploadsDir, uniqueFileName)
-
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
 
     let transcription = ''
     try {
-      transcription = await transcribeAudio(filePath)
+      transcription = await transcribeAudio(file)
     } catch (err) {
       console.error('Transcription error:', err)
     }
@@ -87,7 +73,7 @@ export async function POST(request: NextRequest) {
       data: {
         managerId,
         audioFileName: file.name,
-        audioPath: filePath,
+        audioPath: '', // Local fs write removed for serverless compatibility
         audioData: buffer,
         audioMimeType: file.type || 'audio/mpeg',
         transcription: transcription || null,
