@@ -29,13 +29,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Manager tanlanmagan' }, { status: 400 })
     }
 
-    // Regular users can only upload for their own assigned manager
-    if (!isAdmin && managerId !== sessionUser.managerId) {
-      return NextResponse.json(
-        { error: 'Siz faqat o\'zingizga biriktirilgan manager uchun audio yuklay olasiz' },
-        { status: 403 }
-      )
-    }
+    // MVP Testing: Har qanday user istalgan managerga audio yuklay oladi
+    // if (!isAdmin && managerId !== sessionUser.managerId) {
+    //   return NextResponse.json(
+    //     { error: 'Siz faqat o\'zingizga biriktirilgan manager uchun audio yuklay olasiz' },
+    //     { status: 403 }
+    //   )
+    // }
 
     const manager = await prisma.manager.findUnique({ where: { id: managerId } })
     if (!manager) {
