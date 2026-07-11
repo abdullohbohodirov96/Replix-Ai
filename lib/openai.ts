@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import OpenAI, { toFile } from 'openai'
 import fs from 'fs'
 
 const useGroq = !!process.env.GROQ_API_KEY
@@ -17,7 +17,9 @@ export async function transcribeAudio(fileOrPath: File | string): Promise<string
   if (typeof fileOrPath === 'string') {
     fileToUpload = fs.createReadStream(fileOrPath)
   } else {
-    fileToUpload = fileOrPath
+    const arrayBuffer = await fileOrPath.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    fileToUpload = await toFile(buffer, fileOrPath.name, { type: fileOrPath.type })
   }
   
   const transcription = await openai.audio.transcriptions.create({
