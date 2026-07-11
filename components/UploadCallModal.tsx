@@ -299,6 +299,16 @@ export default function UploadCallModal({ managerId, managerName, managers, exis
                     </audio>
                   </div>
 
+                  {/* Transcription */}
+                  {result.transcription && (
+                    <div className="bg-[#111122] border border-[#1E1E35] rounded-lg p-3">
+                      <div className="text-[10px] font-mono text-[#5555AA] uppercase tracking-widest mb-2">📝 Transkripsiya (Matn)</div>
+                      <p className="text-xs font-mono text-[#9494B8] max-h-40 overflow-y-auto pr-2 whitespace-pre-wrap leading-relaxed">
+                        {result.transcription}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Rating */}
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono text-[#9494B8]">Baho:</span>
