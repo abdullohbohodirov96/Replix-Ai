@@ -116,9 +116,9 @@ export default async function CallsPage() {
                       </Link>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-xs font-mono text-[#5555AA] max-w-[120px] truncate block">
+                      <Link href={`/calls/${call.id}`} className="text-xs font-mono text-[#5555AA] max-w-[120px] truncate block hover:text-[#FF6B35] transition-colors">
                         {call.audioFileName}
-                      </span>
+                      </Link>
                     </td>
                     <td className="px-5 py-3.5">
                       <StarDisplay rating={call.rating} />
@@ -138,11 +138,13 @@ export default async function CallsPage() {
                       )}
                     </td>
                     <td className="px-5 py-3.5 max-w-[200px]">
-                      {call.summary ? (
-                        <p className="text-xs font-mono text-[#9494B8] line-clamp-2">{call.summary}</p>
-                      ) : (
-                        <span className="text-xs font-mono text-[#333360] italic">Tahlil yo'q</span>
-                      )}
+                      <Link href={`/calls/${call.id}`} className="block group">
+                        {call.summary ? (
+                          <p className="text-xs font-mono text-[#9494B8] line-clamp-2 group-hover:text-[#FF6B35] transition-colors">{call.summary}</p>
+                        ) : (
+                          <span className="text-xs font-mono text-[#333360] italic group-hover:text-[#FF6B35] transition-colors">Tahlilni ko'rish</span>
+                        )}
+                      </Link>
                     </td>
                     <td className="px-3 py-3.5">
                       <DeleteCallButton callId={call.id} />
