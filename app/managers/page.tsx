@@ -140,7 +140,7 @@ export default async function ManagersPage() {
             {managers.length} ta manager ro'yxatda
           </p>
         </div>
-        {isAdmin && <AddManagerModal />}
+        {<AddManagerModal />}
       </div>
 
       {/* Grid */}
@@ -155,7 +155,7 @@ export default async function ManagersPage() {
               ? 'Birinchi managerni qo\'shing va qo\'ng\'iroqlarini tahlil qilishni boshlang'
               : 'Admin sizga manager biriktirib qo\'yadi'}
           </p>
-          {isAdmin && <AddManagerModal />}
+          {<AddManagerModal />}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">

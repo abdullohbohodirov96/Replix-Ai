@@ -71,7 +71,7 @@ export default async function CallsPage() {
             Jami {calls.length} ta qo'ng'iroq
           </p>
         </div>
-        {isAdmin && <UploadCallModal managers={managers} />}
+        {<UploadCallModal managers={managers} />}
       </div>
 
       {/* Table */}
@@ -83,7 +83,7 @@ export default async function CallsPage() {
             <p className="text-[#5555AA] font-mono text-sm mb-6">
               Birinchi audio qo'ng'iroqni yuklang va AI tahlilini oling
             </p>
-            {isAdmin && <UploadCallModal managers={managers} />}
+            {<UploadCallModal managers={managers} />}
           </div>
         ) : (
           <div className="overflow-x-auto">
