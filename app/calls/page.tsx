@@ -146,7 +146,13 @@ export default async function CallsPage() {
                         )}
                       </Link>
                     </td>
-                    <td className="px-3 py-3.5">
+                    <td className="px-3 py-3.5 flex items-center justify-end gap-2">
+                      <Link 
+                        href={`/calls/${call.id}`} 
+                        className="px-3 py-1.5 bg-[#FF6B35]/10 hover:bg-[#FF6B35]/20 text-[#FF6B35] text-xs font-display font-600 rounded-lg transition-colors border border-[#FF6B35]/20 whitespace-nowrap"
+                      >
+                        Batafsil ko'rish
+                      </Link>
                       <DeleteCallButton callId={call.id} />
                     </td>
                   </tr>
